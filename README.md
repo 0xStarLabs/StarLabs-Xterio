@@ -1,7 +1,7 @@
 #  StarLabs - Xterio 
 
 
-![Logo](https://i.postimg.cc/VNdZhv44/xterio.png)
+![Logo]([g](https://i.postimg.cc/VNdZhv44/xterio.png))
 
 ## [SEE ENGLISH VERSION BELOW ](https://github.com/0xStarLabs/StarLabs-Twitter#english-version)👇
 
