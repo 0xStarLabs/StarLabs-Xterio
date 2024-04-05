@@ -1,0 +1,2 @@
+0xkey
+Mnemo with 12 words
