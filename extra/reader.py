@@ -23,6 +23,7 @@ def read_config() -> dict:
     settings['attempts'] = int(config['info']['attempts'])
     settings['LAUNCH_TIME'] = int(config['info']['LAUNCH_TIME'])
     settings["mobile_proxy"] = str(config['info']['mobile_proxy'])
+    settings['change_ip_pause'] = int(config['info']['change_ip_pause'])
 
     return settings
 

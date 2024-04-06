@@ -1,2 +1,2 @@
-0xkey
-Mnemo with 12 words
+0xprivatekey
+mnemo words

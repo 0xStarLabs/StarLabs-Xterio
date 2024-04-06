@@ -54,6 +54,10 @@ def start():
                 executor.map(mobile_proxy_wrapper, cycle)
 
             logger.success("Saved accounts and private keys to a file.")
+
+            if task_to_do == 1:
+                break
+
             logger.info(f"Sleeping for {config['LAUNCH_TIME']} hours and starting again...")
 
             time.sleep(config['LAUNCH_TIME'] * 60 * 60)
@@ -72,6 +76,10 @@ def start():
             executor.map(launch_wrapper, indexes, proxies, private_keys)
 
         logger.success("Saved accounts and private keys to a file.")
+
+        if task_to_do == 1:
+            break
+
         logger.info(f"Sleeping for {config['LAUNCH_TIME']} hours and starting again...")
 
         time.sleep(config['LAUNCH_TIME'] * 60 * 60)
@@ -82,17 +90,17 @@ def account_flow(lock: threading.Lock, account_index: int, proxy: str, private_k
     try:
         xterio_instance = model.xterio.Xterio(private_key, proxy, config)
 
-        ok = wrapper(xterio_instance.init_instance, 5)
+        ok = wrapper(xterio_instance.init_instance, 1)
         if not ok:
             raise Exception("unable to init xterio instance")
 
         if task_to_do == 1:
-            ok = wrapper(xterio_instance.register_account, 5)
+            ok = wrapper(xterio_instance.register_account, 1)
             if not ok:
                 raise Exception("registration failed")
 
         if task_to_do == 2:
-            ok = wrapper(xterio_instance.daily_actions, 5)
+            ok = wrapper(xterio_instance.daily_actions, 1)
             if not ok:
                 raise Exception("registration failed")
 

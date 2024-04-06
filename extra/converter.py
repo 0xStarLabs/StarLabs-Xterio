@@ -8,4 +8,3 @@ def mnemonic_to_private_key(mnemonic: str):
 
     bip44_acc_ctx = bip44_mst_ctx.Purpose().Coin().Account(0).Change(Bip44Changes.CHAIN_EXT).AddressIndex(0)
     return bip44_acc_ctx.PrivateKey().Raw().ToHex()
-

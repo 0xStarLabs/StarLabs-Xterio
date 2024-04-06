@@ -32,7 +32,7 @@ class Xterio:
     def init_instance(self):
         for _ in range(5):
             try:
-                if self.private_key.split() > 1:
+                if len(self.private_key.split()) > 1:
                     self.private_key = mnemonic_to_private_key(self.private_key)
 
                 account = Account.from_key(self.private_key)
@@ -59,6 +59,12 @@ class Xterio:
         return False
 
     def register_account(self):
+        sign = False
+        claim_egg = False
+        invited = False
+        reported = False
+        claim_chat_nft = False
+
         for retry in range(self.config['attempts']):
             try:
                 balance = self.check_xter_balance()
@@ -81,30 +87,45 @@ class Xterio:
                     if balance == 0:
                         raise Exception("Failed to deposit BNB")
 
-                ok = self.sign_in()
-                if not ok:
-                    raise Exception("unable to sign in")
-
-                random_pause(3, 5)
-
-                ok = self.claim_egg()
-                if not ok:
-                    raise Exception("unable to claim an egg")
-
-                random_pause(3, 5)
-
-                if self.config['referral_code'] != "no":
-                    ok = self.apply_invite(self.config['referral_code'])
+                if not sign:
+                    ok = self.sign_in()
                     if not ok:
-                        raise Exception("unable to apply invite")
-
-                social_task_ids = [13, 14, 17]
-                for social_task_id in social_task_ids:
-                    ok = self.report(social_task_id)
-                    if not ok:
-                        raise Exception("unable to report")
+                        raise Exception("unable to sign in")
 
                     random_pause(3, 5)
+
+                sign = True
+
+                if not claim_egg:
+                    ok = self.claim_egg()
+                    if not ok:
+                        raise Exception("unable to claim an egg")
+
+                    random_pause(3, 5)
+
+                claim_egg = True
+
+                if not invited:
+                    if self.config['referral_code'] != "no":
+                        ok = self.apply_invite(self.config['referral_code'])
+                        if not ok:
+                            raise Exception("unable to apply invite")
+                invited = True
+
+                if not reported:
+                    social_task_ids = [13, 14, 17]
+                    for social_task_id in social_task_ids:
+                        ok = self.report(social_task_id)
+                        if not ok:
+                            raise Exception("unable to complete tasks")
+
+                        random_pause(3, 5)
+                reported = True
+
+                if not claim_chat_nft:
+                    ok = self.claim_chat_nft()
+                    if not ok:
+                        raise Exception("unable to claim chat NFT")
 
                 return True
 
@@ -115,54 +136,74 @@ class Xterio:
         return False
 
     def daily_actions(self):
+        sign = False
+        utility = False
+        prop = False
+        tasks = False
+        vote = False
+
         for retry in range(self.config['attempts']):
             try:
-                ok = self.sign_in()
-                if not ok:
-                    raise Exception("unable to sign in")
-                random_pause(3, 5)
-
-                for type_num in [1, 2, 3]:
-                    ok, tx_hash = self.claim_utility(type_num)
+                if not sign:
+                    ok = self.sign_in()
                     if not ok:
-                        raise Exception("unable to claim utility")
-
-                    ok = self.trigger(tx_hash)
-                    if not ok:
-                        raise Exception("failed to trigger transaction")
-
+                        raise Exception("unable to sign in")
                     random_pause(3, 5)
 
+                sign = True
+
+                if not utility:
+                    for type_num in [1, 2, 3]:
+                        ok, tx_hash = self.claim_utility(type_num)
+                        if not ok:
+                            raise Exception("unable to claim utility")
+
+                        if tx_hash == "claimed":
+                            continue
+
+                        ok = self.trigger(tx_hash)
+                        if not ok:
+                            raise Exception("failed to trigger transaction")
+
+                        random_pause(3, 5)
+                utility = True
+
                 random_pause(3, 5)
 
-                for type_num in [1, 2, 3]:
-                    ok = self.prop(type_num)
-                    if not ok:
-                        raise Exception("unable to prop")
-                    random_pause(3, 5)
+                if not prop:
+                    for type_num in [1, 2, 3]:
+                        self.prop(type_num)
+                        random_pause(3, 5)
 
-                task_list = self.get_task_list()
-                if not task_list:
-                    raise Exception("unable to get task list")
+                prop = True
 
-                for task in task_list:
-                    task_id = task['ID']
-                    for user_task in task['user_task']:
-                        if user_task['status'] == 1:
-                            ok = self.task(task_id)
-                            if not ok:
-                                raise Exception("unable to do the task")
+                if not tasks:
+                    task_list = self.get_task_list()
+                    if not task_list:
+                        raise Exception("unable to get task list")
 
-                            random_pause(3, 5)
+                    for task in task_list:
+                        task_id = task['ID']
+                        for user_task in task['user_task']:
+                            if user_task['status'] == 1:
+                                ok = self.task(task_id)
+                                if not ok:
+                                    raise Exception("unable to do the task")
 
-                ticket_num = self.get_ticket()
-                if not ticket_num:
-                    raise Exception("unable to get ticket")
+                                random_pause(3, 5)
 
-                if ticket_num > 0:
-                    ok = self.vote(ticket_num, 0)
-                    if not ok:
-                        raise Exception("unable to vote")
+                tasks = True
+
+                if not vote:
+                    ticket_num = self.get_ticket()
+
+                    if not ticket_num:
+                        raise Exception("unable to get ticket")
+
+                    if ticket_num > 0:
+                        ok = self.vote(ticket_num, 0)
+                        if not ok:
+                            raise Exception("unable to vote")
 
                 return True
 
@@ -215,6 +256,7 @@ class Xterio:
 
             except Exception as err:
                 logger.error(f"{self.address} | Failed to deposit to Xterio: {constants.BSC_EXPLORER_TX}{err}")
+                time.sleep(5)
 
         return False
 
@@ -306,7 +348,12 @@ class Xterio:
                     raise Exception(f"{constants.XTERIO_EXPLORER_TX}{tx_hash.hex()}")
 
             except Exception as err:
-                logger.error(f"{self.address} | Failed to claim en egg: {err}")
+                err_str = str(err)
+                if "already claimed" in err_str:
+                    logger.success(f"{self.address} | Egg already claimed!")
+                    return True
+                else:
+                    logger.error(f"{self.address} | Failed to claim an egg: {err_str}")
 
         return False
 
@@ -387,7 +434,12 @@ class Xterio:
                     raise Exception(f"{constants.XTERIO_EXPLORER_TX}{tx_hash.hex()}")
 
             except Exception as err:
-                logger.error(f"{self.address} | Failed to claim utility: {err}")
+                err_str = str(err)
+                if "already claimed" in err_str or "utility claim limit exceeded" in err_str:
+                    logger.success(f"{self.address} | Utility already claimed!")
+                    return True, "claimed"
+                else:
+                    logger.error(f"{self.address} | Failed to claim utility: {err}")
 
         return False, ""
 
@@ -410,7 +462,15 @@ class Xterio:
                     return True
 
             except Exception as err:
-                logger.error(f'{self.address} | Failed to feed an egg: {err}')
+                err_str = str(err)
+                if "no balance" in err_str:
+                    logger.error(f'{self.address} | Failed to feed an egg: balance is too low')
+                    return False
+                elif "record not found" in err_str:
+                    logger.error(f'{self.address} | Failed to feed an egg: record not found. Probably already fed.')
+                    return False
+                else:
+                    logger.error(f'{self.address} | Failed to feed an egg: {err}')
 
         return False
 
@@ -447,11 +507,11 @@ class Xterio:
                     raise Exception(res)
 
                 else:
-                    logger.success(f"{self.address} | Reported task {task_id}")
+                    logger.success(f"{self.address} | Completed task {task_id}")
                     return True
 
             except Exception as err:
-                logger.error(f"{self.address} | Failed to report task {task_id}: {err}")
+                logger.error(f"{self.address} | Failed to complete task {task_id}: {err}")
 
         return False
 
@@ -532,8 +592,13 @@ class Xterio:
                     raise Exception(f"{constants.XTERIO_EXPLORER_TX}{tx_hash.hex()}")
 
             except Exception as err:
-                logger.error(f'{self.address} | Failed to vote onchain: {err}')
+                err_str = str(err)
+                if "Not enough votes" in err_str:
+                    logger.error(f'{self.address} | Failed to vote onchain: not enough votes')
+                    return True
 
+                else:
+                    logger.error(f'{self.address} | Failed to vote onchain: {err}')
         return False
 
     def vote(self, ticket_num, index=0) -> bool:
@@ -562,6 +627,58 @@ class Xterio:
 
             except Exception as err:
                 logger.error(f'{self.address} | Failed to get vote parameters: {err}')
+
+        return False
+
+    def claim_chat_nft(self) -> bool:
+        for _ in range(5):
+            try:
+                params = {
+                    "address": self.address,
+                }
+
+                data = '{"answer":"\\nIn the village of Luminia, Elara\'s heart was captivated by a traveler named Orion. Their connection was instant and deep, filled with shared dreams and starlit nights. As Orion left, the sky lit up with shimmering stars, a celestial celebration of their enduring love.\\n\\n\\n\\n\\n\\n"}'
+
+                resp = self.client.post(f'https://3656kxpioifv7aumlcwe6zcqaa0eeiab.lambda-url.eu-central-1.on.aws/', data=data, params=params)
+
+                # get message score
+
+                response = self.client.get(f"https://api.xter.io/palio/v1/user/{self.address}/chat")
+
+                logger.success(f"{self.address} | Chat message score: {response.json()['data']['max_score']} | Claiming NFT...")
+
+                # claiming NFT
+
+                contract_address = Web3.to_checksum_address(constants.PALIO_INCUBATOR_ADDRESS)
+
+                contract = self.xter_w3.eth.contract(address=contract_address, abi=self.config['abi']['palio_incubator']['abi'])
+
+                transaction = contract.functions.claimChatNFT()
+                built_transaction = transaction.build_transaction({
+                    "from": self.address,
+                    'nonce': self.xter_w3.eth.get_transaction_count(account=self.address),
+                    "gas": int(transaction.estimate_gas({"from": self.address}) * 1.2),
+                })
+
+                signed_transaction = self.xter_w3.eth.account.sign_transaction(built_transaction, private_key=self.private_key)
+
+                tx_hash = self.xter_w3.eth.send_raw_transaction(signed_transaction.rawTransaction)
+                receipt = self.xter_w3.eth.wait_for_transaction_receipt(tx_hash)
+
+                if receipt.status == 1:
+                    logger.success(f"{self.address} | Claimed chat NFT: {constants.XTERIO_EXPLORER_TX}{tx_hash.hex()}")
+                    return True
+
+                else:
+                    raise Exception(f"{constants.XTERIO_EXPLORER_TX}{tx_hash.hex()}")
+
+            except Exception as err:
+                err_str = str(err)
+                if "already claimed" in err_str:
+                    logger.success(f"{self.address} | Chat NFT already claimed!")
+                    return True
+                else:
+                    logger.error(f'{self.address} | Failed to claim chat nft: {err}')
 
         return False
 
