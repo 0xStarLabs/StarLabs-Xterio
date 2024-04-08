@@ -129,10 +129,9 @@ def wrapper(function, attempts: int, *args, **kwargs):
 
 def report_failed_key(private_key: str, lock: threading.Lock, proxy: str):
     try:
-        with lock:
-            with open("data/failed_keys.txt", "a") as file:
-                file.write(private_key + ":" + proxy + "\n")
-                return
+        with open("data/failed_keys.txt", "a") as file:
+            file.write(private_key + ":" + proxy + "\n")
+            return
 
     except Exception as err:
         logger.error(f"Error while reporting failed account: {err}")
