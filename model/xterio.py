@@ -241,7 +241,7 @@ class Xterio:
                     'from': self.address,
                     'gasPrice': self.bsc_w3.eth.gas_price,
                     'nonce': self.bsc_w3.eth.get_transaction_count(account=self.address),
-                    'gas': gas,
+                    'gas': int(gas * random.uniform(1.25, 1.3)),
                     'value': amount,
                 })
                 signed_transaction = self.bsc_w3.eth.account.sign_transaction(transaction, private_key=self.private_key)
