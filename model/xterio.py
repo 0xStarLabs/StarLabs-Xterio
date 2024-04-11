@@ -602,33 +602,43 @@ class Xterio:
         return False
 
     def vote(self, ticket_num, index=0) -> bool:
-        for _ in range(5):
-            try:
-                json_data = {
-                    'index': index,
-                    'num': ticket_num,
-                }
+        contract_address = Web3.to_checksum_address(constants.PALIO_VOTER_ADDRESS)
 
-                response = self.client.post(f'https://api.xter.io/palio/v1/user/{self.address}/vote', json=json_data)
+        contract = self.xter_w3.eth.contract(address=contract_address, abi=self.config['abi']['palio_voter']['abi'])
 
-                res = response.json()
+        voted_amount = contract.functions.userVotedAmt(self.address).call()
 
-                if res['err_code'] != 0:
-                    raise Exception(res)
+        if ticket_num > voted_amount:
+            for _ in range(5):
+                try:
+                    json_data = {
+                        'index': index,
+                        'num': ticket_num - voted_amount,
+                    }
 
-                else:
-                    ok = self.vote_onchain(res['data'])
-                    if ok:
-                        logger.success(f"{self.address} | Getting the polling parameters was successful")
-                        return True
+                    response = self.client.post(f'https://api.xter.io/palio/v1/user/{self.address}/vote', json=json_data)
 
-                    else:
+                    res = response.json()
+
+                    if res['err_code'] != 0:
                         raise Exception(res)
 
-            except Exception as err:
-                logger.error(f'{self.address} | Failed to get vote parameters: {err}')
+                    else:
+                        ok = self.vote_onchain(res['data'])
+                        if ok:
+                            logger.success(f"{self.address} | Getting the polling parameters was successful")
+                            return True
 
-        return False
+                        else:
+                            raise Exception(res)
+
+                except Exception as err:
+                    logger.error(f'{self.address} | Failed to get vote parameters: {err}')
+
+            return False
+        else:
+            logger.success(f"{self.address} | All votes have been cast")
+            return True
 
     def claim_chat_nft(self) -> bool:
         for _ in range(5):
