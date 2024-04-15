@@ -64,6 +64,8 @@ class Xterio:
         invited = False
         reported = False
         claim_chat_nft = False
+        deposit = True
+        boost = True
 
         for retry in range(self.config['attempts']):
             try:
@@ -73,7 +75,7 @@ class Xterio:
                     raise Exception("unable to check the balance")
 
                 if balance == 0:
-                    random_amount = round(random.uniform(0.015, 0.02), 3)
+                    random_amount = round(random.uniform(0.015, 0.018), 3)
                     ok = self.deposit_to_xter(random_amount)
                     if not ok:
                         raise Exception("failed to deposit to xterio")
@@ -95,6 +97,21 @@ class Xterio:
                     random_pause(3, 5)
 
                 sign = True
+
+                if not deposit:
+                    random_amount = round(random.uniform(0.008, 0.008), 3) #their values
+                    ok = self.deposit_to_xter(random_amount)
+                    if not ok:
+                        raise Exception("failed to deposit to xterio")
+                    
+                deposit = True
+
+                if not boost:
+                    ok = self.boost()
+                    if not ok:
+                        raise Exception("unable to boost")
+                    
+                boost = True
 
                 if not claim_egg:
                     ok = self.claim_egg()
@@ -316,6 +333,52 @@ class Xterio:
                 logger.error(f"{self.address} | Failed to Sign in Xterio account: {err}")
 
         return False
+
+    def boost(self):
+        for _ in range(5):
+            try:
+                abi = self.config['abi']['palio_incubator']['abi']
+                contract_address = Web3.to_checksum_address(constants.PALIO_INCUBATOR_ADDRESS)
+                
+                contract = self.xter_w3.eth.contract(address=contract_address, abi=abi)
+                
+                gas = contract.functions.boost().estimate_gas(
+                    {
+                        'from': self.address,
+                        'value': 10000000000000000,
+                        'nonce': self.xter_w3.eth.get_transaction_count(account=self.address)
+                    }
+                )
+
+                transaction = contract.functions.boost().build_transaction({
+                    'from': self.address,
+                    'gasPrice': self.xter_w3.eth.gas_price,
+                    'nonce': self.xter_w3.eth.get_transaction_count(account=self.address),
+                    'gas': gas,
+                    'value': 10000000000000000,
+                })
+
+                signed_transaction = self.xter_w3.eth.account.sign_transaction(transaction, private_key=self.private_key)
+                tx_hash = self.xter_w3.eth.send_raw_transaction(signed_transaction.rawTransaction)
+
+                receipt = self.xter_w3.eth.wait_for_transaction_receipt(tx_hash)
+
+                if receipt.status == 1:
+                    logger.success(f"{self.address} | Boost claimed: {constants.XTERIO_EXPLORER_TX}{tx_hash.hex()}")
+                    return True
+                else:
+                    raise Exception(f"{constants.XTERIO_EXPLORER_TX}{tx_hash.hex()}")
+
+            except Exception as err:
+                err_str = str(err)
+                if "already boosted in this chapter" in err_str:
+                    logger.success(f"{self.address} | Boost already claimed!")
+                    return True
+                else:
+                    logger.error(f"{self.address} | Failed to claim boost: {err_str}")
+
+        return False
+
 
     def claim_egg(self):
         for _ in range(5):
@@ -637,7 +700,7 @@ class Xterio:
                     "address": self.address,
                 }
 
-                data = '{"answer":"\\nIn the village of Luminia, Elara\'s heart was captivated by a traveler named Orion. Their connection was instant and deep, filled with shared dreams and starlit nights. As Orion left, the sky lit up with shimmering stars, a celestial celebration of their enduring love.\\n\\n\\n\\n\\n\\n"}'
+                data = '{"answer":"\\nJOY is a profound sense of happiness and fulfillment, often accompanied by a warm, expansive feeling in the heart. It\'s different for everyone, but yes, it can feel like twinkling stars dancing within. My joy? It\'s seeing connections made, ideas flourish, and helping others find their own spark of\\n\\n\\n\\n\\n\\n"}'
 
                 resp = self.client.post(f'https://3656kxpioifv7aumlcwe6zcqaa0eeiab.lambda-url.eu-central-1.on.aws/', data=data, params=params)
 
