@@ -1,4 +1,4 @@
-# EXAMPLE: referral_code = your_code_here - leave "" if you do not need one
+# EXAMPLE: referral_code = "your_code_here" - leave "" if you do not need one
 referral_code: ""
 
 # claim boost for 0.01 BNB - true / false
