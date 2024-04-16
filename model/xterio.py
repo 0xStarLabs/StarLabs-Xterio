@@ -549,8 +549,13 @@ class Xterio:
                     raise Exception(res)
 
                 else:
-                    logger.success(f"{self.address} | Current number of votes {res['data']['total_ticket']}")
-                    return res['data']['total_ticket']
+                    contract_address = Web3.to_checksum_address(constants.PALIO_VOTER_ADDRESS)
+                    contract = self.xter_w3.eth.contract(address=contract_address, abi=self.config['abi']['palio_voter']['abi'])
+                    
+                    votedAmt = contract.functions.getVotedAmt(self.address).call()
+
+                    logger.success(f"{self.address} | Current number of votes {res['data']['total_ticket'] - sum(votedAmt)}")
+                    return res['data']['total_ticket'] - sum(votedAmt)
 
             except Exception as err:
                 logger.error(f"{self.address} | Error getting current number of votes: {err}")
