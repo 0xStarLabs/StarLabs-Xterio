@@ -1,6 +1,7 @@
 import json
 from configparser import ConfigParser
 
+import yaml
 from loguru import logger
 
 
@@ -13,19 +14,10 @@ def read_txt_file(file_name: str, file_path: str) -> list:
 
 
 def read_config() -> dict:
-    settings = {}
-    config = ConfigParser()
-    config.read('config.ini')
-    # INFO
-    settings["referral_code"] = str(config['info']['referral_code'])
-    settings["XTERIO_RPC"] = str(config['info']['XTERIO_RPC'])
-    settings["BSC_RPC"] = str(config['info']['BSC_RPC'])
-    settings['attempts'] = int(config['info']['attempts'])
-    settings['LAUNCH_TIME'] = int(config['info']['LAUNCH_TIME'])
-    settings["mobile_proxy"] = str(config['info']['mobile_proxy'])
-    settings['change_ip_pause'] = int(config['info']['change_ip_pause'])
+    with open('config.yaml', 'r', encoding='utf-8') as file:
+        config = yaml.safe_load(file)
 
-    return settings
+    return config
 
 
 def read_abi(path) -> dict:

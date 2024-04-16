@@ -1,0 +1,24 @@
+# EXAMPLE: referral_code = your_code_here - leave "" if you do not need one
+referral_code: ""
+
+# claim boost for 0.01 BNB - true / false
+claim_boost: false
+
+# number of retries
+attempts: 2
+
+# use accounts in random order - true / false
+shuffle_accounts: false
+
+# withdraw BNB from binance if balance is too low - true / false
+binance_withdrawal: false
+binance_api_key: ""
+binance_api_secret: ""
+
+# RPCs, change if you want
+XTERIO_RPC: "https://xterio.alt.technology"
+BSC_RPC: "https://rpc.ankr.com/bsc"
+
+# mobile proxy (yes or no)
+mobile_proxy: "no"
+change_ip_pause: 20

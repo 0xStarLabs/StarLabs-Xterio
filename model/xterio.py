@@ -1,21 +1,21 @@
-import traceback
-from typing import Tuple
-
 from web3.middleware import geth_poa_middleware
 from eth_account.messages import encode_defunct
 from eth_typing import ChecksumAddress
 import requests as default_requests
 from eth_account import Account
 from curl_cffi import requests
+from decimal import Decimal
 from web3.types import Wei
 from loguru import logger
 from web3 import Web3
+import traceback
 import random
 import time
 
 from extra.client import create_client
 from extra.converter import mnemonic_to_private_key
-from model import constants
+from model import constants, utils, binance
+from data import chat_messages
 
 
 class Xterio:
@@ -39,10 +39,12 @@ class Xterio:
                 self.address = account.address
 
                 session = default_requests.Session()
-                session.proxies.update({
-                    'http': f'http://{self.proxy}',
-                    'https': f'http://{self.proxy}',
-                })
+
+                if self.proxy:
+                    session.proxies.update({
+                        'http': f'http://{self.proxy}',
+                        'https': f'http://{self.proxy}',
+                    })
 
                 self.xter_w3 = Web3(Web3.HTTPProvider(self.config['XTERIO_RPC'], session=session))
                 self.xter_w3.middleware_onion.inject(geth_poa_middleware, layer=0)
@@ -58,17 +60,27 @@ class Xterio:
 
         return False
 
-    def register_account(self):
+    def daily_actions(self):
         sign = False
+        utility = False
+        feed_the_egg = False
+        tasks = False
+        vote = False
         claim_egg = False
-        invited = False
-        reported = False
-        claim_chat_nft = False
-
         for retry in range(self.config['attempts']):
             try:
-                balance = self.check_xter_balance()
 
+                if not sign:
+                    ok, is_new = self.sign_in()
+                    if not ok:
+                        raise Exception("unable to sign in")
+
+                    utils.random_pause(3, 5)
+
+                sign = True
+                utils.random_pause(5, 10)
+
+                balance = self.check_xter_balance()
                 if balance is False:
                     raise Exception("unable to check the balance")
 
@@ -87,70 +99,42 @@ class Xterio:
                     if balance == 0:
                         raise Exception("Failed to deposit BNB")
 
-                if not sign:
-                    ok = self.sign_in()
-                    if not ok:
-                        raise Exception("unable to sign in")
-
-                    random_pause(3, 5)
-
-                sign = True
-
                 if not claim_egg:
                     ok = self.claim_egg()
                     if not ok:
                         raise Exception("unable to claim an egg")
 
-                    random_pause(3, 5)
+                    utils.random_pause(3, 5)
 
                 claim_egg = True
 
-                if not invited:
-                    if self.config['referral_code'] != "no":
-                        ok = self.apply_invite(self.config['referral_code'])
-                        if not ok:
-                            raise Exception("unable to apply invite")
-                invited = True
-
-                if not reported:
-                    social_task_ids = [13, 14, 17]
-                    for social_task_id in social_task_ids:
-                        ok = self.report(social_task_id)
-                        if not ok:
-                            raise Exception("unable to complete tasks")
-
-                        random_pause(3, 5)
-                reported = True
-
-                if not claim_chat_nft:
-                    ok = self.claim_chat_nft()
+                if self.config['referral_code']:
+                    ok = self.apply_invite(self.config['referral_code'])
                     if not ok:
-                        raise Exception("unable to claim chat NFT")
+                        raise Exception("unable to apply invite")
 
-                return True
+                task_list = self.get_task_list()
+                if not task_list:
+                    raise Exception("unable to get task list")
 
-            except Exception as err:
-                logger.error(f"{self.address} | Failed to register new account ({retry + 1}/{self.config['attempts']}): {err}")
-                time.sleep(10)
+                if self.config['claim_boost']:
+                    for task in task_list:
+                        if task.get("ID") == 12:
+                            if not task.get("user_task"):
+                                ok = self.claim_boost()
+                                if not ok:
+                                    raise Exception("unable to claim the boost")
+                                utils.random_pause(3, 5)
+                            else:
+                                logger.success(f"{self.address} | Boost already claimed!")
 
-        return False
-
-    def daily_actions(self):
-        sign = False
-        utility = False
-        prop = False
-        tasks = False
-        vote = False
-
-        for retry in range(self.config['attempts']):
-            try:
-                if not sign:
-                    ok = self.sign_in()
-                    if not ok:
-                        raise Exception("unable to sign in")
-                    random_pause(3, 5)
-
-                sign = True
+                for task in task_list:
+                    if task.get("ID") == 12:
+                        ok = self.claim_chat_nft()
+                        if not ok:
+                            raise Exception("unable to claim chat NFT")
+                        else:
+                            logger.success(f"{self.address} | Chat NFT claimed!")
 
                 if not utility:
                     for type_num in [1, 2, 3]:
@@ -165,23 +149,24 @@ class Xterio:
                         if not ok:
                             raise Exception("failed to trigger transaction")
 
-                        random_pause(3, 5)
+                        utils.random_pause(10, 15)
+
                 utility = True
 
-                random_pause(3, 5)
+                task_list = self.get_task_list()
+                if not task_list:
+                    raise Exception("unable to get task list")
 
-                if not prop:
+                utils.random_pause(3, 5)
+
+                if not feed_the_egg:
                     for type_num in [1, 2, 3]:
-                        self.prop(type_num)
-                        random_pause(3, 5)
+                        self.feed_the_egg(type_num)
+                        utils.random_pause(3, 5)
 
-                prop = True
+                feed_the_egg = True
 
                 if not tasks:
-                    task_list = self.get_task_list()
-                    if not task_list:
-                        raise Exception("unable to get task list")
-
                     for task in task_list:
                         task_id = task['ID']
                         for user_task in task['user_task']:
@@ -190,15 +175,27 @@ class Xterio:
                                 if not ok:
                                     raise Exception("unable to do the task")
 
-                                random_pause(3, 5)
+                                utils.random_pause(3, 5)
 
                 tasks = True
 
-                if not vote:
-                    ticket_num = self.get_ticket()
+                social_task_ids = [13, 14, 17, 11, 15, 16, 12]
+                for social_task_id in social_task_ids:
+                    ok = self.report(social_task_id)
+                    if not ok:
+                        raise Exception("unable to complete tasks")
 
-                    if not ticket_num:
-                        raise Exception("unable to get ticket")
+                    ok = self.task(social_task_id)
+                    if not ok:
+                        raise Exception("unable to do the task")
+
+                    utils.random_pause(10, 15)
+
+                if not vote:
+                    ticket_num = self.get_tickets_number()
+
+                    if ticket_num is False:
+                        raise Exception("unable to get number of tickets")
 
                     if ticket_num > 0:
                         ok = self.vote(ticket_num, 0)
@@ -209,7 +206,6 @@ class Xterio:
 
             except Exception as err:
                 logger.error(f"{self.address} | Failed to do daily tasks ({retry + 1}/{self.config['attempts']}): {err}")
-                time.sleep(10)
 
         return False
 
@@ -222,41 +218,79 @@ class Xterio:
 
         return False
 
-    def deposit_to_xter(self, amount):
+    def check_bnb_balance(self) -> Wei | bool:
         for _ in range(5):
             try:
+                return self.bsc_w3.eth.get_balance(self.address)
+            except Exception as err:
+                logger.error(f"{self.address} | Failed to get BNB balance: {err}")
+
+        return False
+
+    def deposit_to_xter(self, amount_to_deposit):
+        for _ in range(5):
+            try:
+                bnb_balance = self.check_bnb_balance()
+                if not bnb_balance:
+                    raise Exception("Unable to check the BNB balance")
+
+                # Convert BNB balance from Wei to Ether only once
+                bnb_balance_ether = Decimal(self.bsc_w3.from_wei(bnb_balance, 'ether'))
+                amount_to_deposit_decimal = Decimal(amount_to_deposit)
+
+                if amount_to_deposit_decimal > bnb_balance_ether:
+                    random_buffer = Decimal(random.uniform(0.0052, 0.0065))
+                    amount_to_withdraw = amount_to_deposit_decimal - bnb_balance_ether + random_buffer
+
+                    logger.info(f"{self.address} | BNB balance is too low, trying to withdraw from Binance...")
+                    ok = binance.withdraw_from_binance(api_key=self.config['binance_api_key'], api_secret=self.config['binance_api_secret'],  asset="BNB", amount=float(amount_to_withdraw), address=self.address, network="BSC")
+                    if not ok:
+                        return False
+
+                    counter = 0
+                    while True:
+                        counter += 1
+                        bnb_balance_new = self.check_bnb_balance()
+                        if bnb_balance_new > bnb_balance:
+                            logger.success(f"{self.address} | Received BNB")
+                            break
+                        else:
+                            if counter == 30:
+                                raise Exception("Unable to withdraw BNB")
+                            logger.info(f"{self.address} | Haven't gotten a BNB yet")
+                            utils.random_pause(8, 10)
+
                 contract_address = Web3.to_checksum_address(constants.XTERIO_DEPOSIT_ADDRESS)
-
                 contract = self.bsc_w3.eth.contract(address=contract_address, abi=self.config['abi']['deposit']['abi'])
-                amount = self.bsc_w3.to_wei(amount, 'ether')
+                amount = self.bsc_w3.to_wei(amount_to_deposit_decimal, 'ether')
 
-                gas = contract.functions.depositETH(200000, '0x').estimate_gas(
-                    {
-                        'from': self.address,
-                        'value': amount,
-                        'nonce': self.bsc_w3.eth.get_transaction_count(account=self.address)
-                    }
-                )
+                amount_in_wei_80_percent = int(amount * 0.8)
+
+                gas = contract.functions.depositETH(200000, '0x').estimate_gas({
+                    'from': self.address,
+                    'value': amount_in_wei_80_percent,
+                    'nonce': self.bsc_w3.eth.get_transaction_count(account=self.address)
+                })
                 transaction = contract.functions.depositETH(200000, '0x').build_transaction({
                     'from': self.address,
                     'gasPrice': self.bsc_w3.eth.gas_price,
                     'nonce': self.bsc_w3.eth.get_transaction_count(account=self.address),
-                    'gas': gas,
-                    'value': amount,
+                    'gas': gas * int(random.uniform(1.5, 1.6)),
+                    'value': amount_in_wei_80_percent,
                 })
                 signed_transaction = self.bsc_w3.eth.account.sign_transaction(transaction, private_key=self.private_key)
                 tx_hash = self.bsc_w3.eth.send_raw_transaction(signed_transaction.rawTransaction)
                 receipt = self.bsc_w3.eth.wait_for_transaction_receipt(tx_hash)
 
                 if receipt.status == 1:
-                    logger.success(f"{self.address} | Deposit to Xterio: {constants.BSC_EXPLORER_TX}{tx_hash.hex()}")
+                    logger.success(f"{self.address} | Deposit to Xterio successful: {constants.BSC_EXPLORER_TX}{tx_hash.hex()}")
                     return True
                 else:
-                    raise Exception(tx_hash.hex())
+                    raise Exception(f"Transaction failed with hash {tx_hash.hex()}")
 
             except Exception as err:
-                logger.error(f"{self.address} | Failed to deposit to Xterio: {constants.BSC_EXPLORER_TX}{err}")
-                time.sleep(5)
+                logger.error(f"{self.address} | Failed to deposit to Xterio: {err}")
+                time.sleep(15)
 
         return False
 
@@ -289,7 +323,7 @@ class Xterio:
 
         return signature
 
-    def sign_in(self) -> bool:
+    def sign_in(self) -> tuple[bool, bool]:
         for _ in range(5):
             try:
                 signature = self.get_signature()
@@ -304,18 +338,20 @@ class Xterio:
                 response = self.client.post('https://api.xter.io/account/v1/login/wallet', json=json_data)
                 res = response.json()
 
+                is_new = True if int(res['data']['is_new']) == 1 else False
+
                 if res['err_code'] != 0:
                     raise Exception(res)
 
                 else:
-                    logger.success(f"{self.address} | Sign into Xterio account")
+                    logger.success(f"{self.address} | Sign into Xterio account.")
                     self.client.headers.update({"authorization": res['data']['id_token']})
-                    return True
+                    return True, is_new
 
             except Exception as err:
                 logger.error(f"{self.address} | Failed to Sign in Xterio account: {err}")
 
-        return False
+        return False, False
 
     def claim_egg(self):
         for _ in range(5):
@@ -357,6 +393,61 @@ class Xterio:
 
         return False
 
+    def claim_boost(self):
+        for _ in range(5):
+            try:
+                abi = self.config['abi']['palio_incubator']['abi']
+                contract_address = Web3.to_checksum_address(constants.PALIO_INCUBATOR_ADDRESS)
+
+                contract = self.xter_w3.eth.contract(address=contract_address, abi=abi)
+
+                value_in_wei = Web3.to_wei(0.01, 'ether')  # 0.01 BNB
+
+                # Максимальная стоимость газа в Wei
+                max_gas_fee_in_wei = Web3.to_wei(random.uniform(0.0003, 0.0004), 'ether')
+
+                # Получение текущей цены газа
+                current_gas_price = self.xter_w3.eth.gas_price
+
+                max_gas = int(max_gas_fee_in_wei / current_gas_price)
+
+                gas = contract.functions.boost().estimate_gas(
+                    {
+                        'from': self.address,
+                        'nonce': self.xter_w3.eth.get_transaction_count(account=self.address),
+                        'value': value_in_wei
+                    }
+                )
+
+                gas_limit = min(gas, max_gas)
+
+                transaction = contract.functions.boost().build_transaction({
+                    'gasPrice': self.xter_w3.eth.gas_price,
+                    'nonce': self.xter_w3.eth.get_transaction_count(account=self.address),
+                    'gas': gas_limit,
+                    'value': value_in_wei
+                })
+                signed_transaction = self.xter_w3.eth.account.sign_transaction(transaction, private_key=self.private_key)
+                tx_hash = self.xter_w3.eth.send_raw_transaction(signed_transaction.rawTransaction)
+
+                receipt = self.xter_w3.eth.wait_for_transaction_receipt(tx_hash)
+
+                if receipt.status == 1:
+                    logger.success(f"{self.address} | Boost claimed: {constants.XTERIO_EXPLORER_TX}{tx_hash.hex()}")
+                    return True
+                else:
+                    raise Exception(f"{constants.XTERIO_EXPLORER_TX}{tx_hash.hex()}")
+
+            except Exception as err:
+                err_str = str(err)
+                if "already claimed" in err_str:
+                    logger.success(f"{self.address} | Boost already claimed!")
+                    return True
+                else:
+                    logger.error(f"{self.address} | Failed to claim the boost: {err_str}")
+
+        return False
+
     def apply_invite(self, invite_code) -> bool:
         for _ in range(5):
             try:
@@ -376,6 +467,10 @@ class Xterio:
                     return True
 
             except Exception as err:
+                str_err = str(err)
+                if "only one invite code can be used" in str_err:
+                    logger.success(f"{self.address} | Invite code applied!")
+                    return True
                 logger.error(f"{self.address} | Failed to apply invite: {err}")
 
         return False
@@ -397,7 +492,7 @@ class Xterio:
                     raise Exception(res)
 
                 else:
-                    logger.success(f"{self.address} | Triggered")
+                    logger.success(f"{self.address} | Transaction triggered")
                     return True
 
             except Exception as err:
@@ -428,7 +523,7 @@ class Xterio:
                 receipt = self.xter_w3.eth.wait_for_transaction_receipt(tx_hash)
 
                 if receipt.status == 1:
-                    logger.success(f"{self.address} | Utility claimed: {constants.XTERIO_EXPLORER_TX}{tx_hash.hex()}")
+                    logger.success(f"{self.address} | The food is claimed: {constants.XTERIO_EXPLORER_TX}{tx_hash.hex()}")
                     return True, tx_hash.hex()
                 else:
                     raise Exception(f"{constants.XTERIO_EXPLORER_TX}{tx_hash.hex()}")
@@ -436,14 +531,14 @@ class Xterio:
             except Exception as err:
                 err_str = str(err)
                 if "already claimed" in err_str or "utility claim limit exceeded" in err_str:
-                    logger.success(f"{self.address} | Utility already claimed!")
+                    logger.success(f"{self.address} | The food ({type_num}) is already claimed!")
                     return True, "claimed"
                 else:
-                    logger.error(f"{self.address} | Failed to claim utility: {err}")
+                    logger.error(f"{self.address} | Failed to claim the food ({type_num}): {err}")
 
         return False, ""
 
-    def prop(self, type_num) -> bool:
+    def feed_the_egg(self, type_num) -> bool:
         for _ in range(5):
             try:
                 json_data = {
@@ -464,13 +559,13 @@ class Xterio:
             except Exception as err:
                 err_str = str(err)
                 if "no balance" in err_str:
-                    logger.error(f'{self.address} | Failed to feed an egg: balance is too low')
+                    logger.info(f'{self.address} | Can\'t feed the egg: no food')
                     return False
                 elif "record not found" in err_str:
-                    logger.error(f'{self.address} | Failed to feed an egg: record not found. Probably already fed.')
+                    logger.error(f'{self.address} | Can\'t feed the egg: record not found. Probably already fed.')
                     return False
                 else:
-                    logger.error(f'{self.address} | Failed to feed an egg: {err}')
+                    logger.error(f'{self.address} | Can\'t feed the egg: {err}')
 
         return False
 
@@ -489,29 +584,6 @@ class Xterio:
 
             except Exception as err:
                 logger.error(f'{self.address} | Failed to get task ID: {err}')
-
-        return False
-
-    def report(self, task_id) -> bool:
-        for _ in range(5):
-            try:
-                json_data = {
-                    'task_id': task_id,
-                }
-
-                response = self.client.post(f'https://api.xter.io/palio/v1/user/{self.address}/task/report', json=json_data)
-
-                res = response.json()
-
-                if res['err_code'] != 0:
-                    raise Exception(res)
-
-                else:
-                    logger.success(f"{self.address} | Completed task {task_id}")
-                    return True
-
-            except Exception as err:
-                logger.error(f"{self.address} | Failed to complete task {task_id}: {err}")
 
         return False
 
@@ -534,11 +606,44 @@ class Xterio:
                     return True
 
             except Exception as err:
+                str_err = str(err)
+                if any(sub in str_err for sub in ["last sub task error", "sub task error"]):
+                    logger.success(f"{self.address} | Submit task {task_id}")
+                    return True
+
                 logger.error(f"{self.address} | Error submitting task {task_id}: {err}")
 
         return False
 
-    def get_ticket(self) -> str | bool:
+    def report(self, task_id) -> bool:
+        for _ in range(5):
+            try:
+                json_data = {
+                    'task_id': task_id,
+                }
+
+                response = self.client.post(f'https://api.xter.io/palio/v1/user/{self.address}/task/report', json=json_data)
+
+                res = response.json()
+
+                if res['err_code'] != 0:
+                    raise Exception(res)
+
+                else:
+                    logger.success(f"{self.address} | Completed task {task_id}")
+                    return True
+
+            except Exception as err:
+                err_str = str(err)
+                if "already all finshed" in err_str:
+                    logger.success(f"{self.address} | Completed task {task_id}")
+                    return True
+                else:
+                    logger.error(f"{self.address} | Failed to complete task {task_id}: {err}")
+
+        return False
+
+    def get_tickets_number(self) -> int | bool:
         for _ in range(5):
             try:
                 response = self.client.get(f'https://api.xter.io/palio/v1/user/{self.address}/ticket')
@@ -549,15 +654,15 @@ class Xterio:
                     raise Exception(res)
 
                 else:
-                    logger.success(f"{self.address} | Current number of votes {res['data']['total_ticket']}")
+                    logger.success(f"{self.address} | Total number of votes {res['data']['total_ticket']}")
                     return res['data']['total_ticket']
 
             except Exception as err:
-                logger.error(f"{self.address} | Error getting current number of votes: {err}")
+                logger.error(f"{self.address} | Error getting current number of tickets: {err}")
 
         return False
 
-    def vote_onchain(self, vote_param) -> bool:
+    def vote_onchain(self, vote_param) -> tuple[bool, bool]:
         for _ in range(5):
             try:
                 contract_address = Web3.to_checksum_address(constants.PALIO_VOTER_ADDRESS)
@@ -586,7 +691,7 @@ class Xterio:
 
                 if receipt.status == 1:
                     logger.success(f"{self.address} | The onchain vote was successful: {constants.XTERIO_EXPLORER_TX}{tx_hash.hex()}")
-                    return True
+                    return True, True
 
                 else:
                     raise Exception(f"{constants.XTERIO_EXPLORER_TX}{tx_hash.hex()}")
@@ -594,39 +699,47 @@ class Xterio:
             except Exception as err:
                 err_str = str(err)
                 if "Not enough votes" in err_str:
-                    logger.error(f'{self.address} | Failed to vote onchain: not enough votes')
-                    return True
+                    return False, False
 
                 else:
                     logger.error(f'{self.address} | Failed to vote onchain: {err}')
-        return False
 
-    def vote(self, ticket_num, index=0) -> bool:
-        for _ in range(5):
-            try:
-                json_data = {
-                    'index': index,
-                    'num': ticket_num,
-                }
+        return False, True
 
-                response = self.client.post(f'https://api.xter.io/palio/v1/user/{self.address}/vote', json=json_data)
+    def vote(self, ticket_num: int, index=0) -> bool:
+        for _ in range(2):
+            current_ticket_amount = ticket_num
 
-                res = response.json()
+            while current_ticket_amount > 0:
+                current_ticket_amount -= 1
 
-                if res['err_code'] != 0:
-                    raise Exception(res)
+                try:
+                    json_data = {
+                        'index': index,
+                        'num': current_ticket_amount,
+                    }
 
-                else:
-                    ok = self.vote_onchain(res['data'])
-                    if ok:
-                        logger.success(f"{self.address} | Getting the polling parameters was successful")
-                        return True
+                    response = self.client.post(f'https://api.xter.io/palio/v1/user/{self.address}/vote', json=json_data)
 
-                    else:
+                    res = response.json()
+
+                    if res['err_code'] != 0:
                         raise Exception(res)
 
-            except Exception as err:
-                logger.error(f'{self.address} | Failed to get vote parameters: {err}')
+                    else:
+                        ok, enough = self.vote_onchain(res['data'])
+                        if ok:
+                            logger.success(f"{self.address} | Voting was successful")
+                            return True
+
+                        else:
+                            if not enough:
+                                continue
+                            else:
+                                raise Exception(res)
+
+                except Exception as err:
+                    logger.error(f'{self.address} | Failed to vote: {err}')
 
         return False
 
@@ -637,7 +750,7 @@ class Xterio:
                     "address": self.address,
                 }
 
-                data = '{"answer":"\\nIn the village of Luminia, Elara\'s heart was captivated by a traveler named Orion. Their connection was instant and deep, filled with shared dreams and starlit nights. As Orion left, the sky lit up with shimmering stars, a celestial celebration of their enduring love.\\n\\n\\n\\n\\n\\n"}'
+                data = f'{{"answer":"{random.choice(chat_messages.CHAT_MESSAGES)}"}}'
 
                 resp = self.client.post(f'https://3656kxpioifv7aumlcwe6zcqaa0eeiab.lambda-url.eu-central-1.on.aws/', data=data, params=params)
 
@@ -681,7 +794,3 @@ class Xterio:
                     logger.error(f'{self.address} | Failed to claim chat nft: {err}')
 
         return False
-
-
-def random_pause(start, end):
-    time.sleep(random.randint(start, end))

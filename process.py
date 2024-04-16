@@ -1,4 +1,5 @@
 import queue
+import random
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -13,12 +14,10 @@ import model
 def start():
     extra.show_logo()
     extra.show_dev_info()
-    extra.show_menu(["New account registration", "Daily check in"])
 
     def launch_wrapper(index, proxy, private_key):
-        account_flow(lock, index, proxy, private_key, config, task_to_do)
+        account_flow(lock, index, proxy, private_key, config)
 
-    task_to_do = int(input("Your choice: ").strip())
     threads = int(input("\nHow many threads do you want: ").strip())
 
     config = extra.read_config()
@@ -28,6 +27,11 @@ def start():
     private_keys = extra.read_txt_file("private keys", "data/private_keys.txt")
     indexes = [i + 1 for i in range(len(private_keys))]
     mobile_proxy_queue = queue.Queue()
+
+    if config['shuffle_accounts']:
+        combined = list(zip(indexes, proxies, private_keys))
+        random.shuffle(combined)
+        indexes, proxies, private_keys = zip(*combined)
 
     use_proxy = True
     if len(proxies) == 0:
@@ -45,24 +49,15 @@ def start():
             mobile_proxy_queue.put(i)
         cycle = []
         for i in range(len(proxies)):
-            data_list = (proxies[i], ip_change_links[i], mobile_proxy_queue, config, lock, private_keys, task_to_do)
+            data_list = (proxies[i], ip_change_links[i], mobile_proxy_queue, config, lock, private_keys)
             cycle.append(data_list)
 
-        while True:
-            logger.info("Starting...")
-            with ThreadPoolExecutor() as executor:
-                executor.map(mobile_proxy_wrapper, cycle)
+        logger.info("Starting...")
+        with ThreadPoolExecutor() as executor:
+            executor.map(mobile_proxy_wrapper, cycle)
 
-            logger.success("Saved accounts and private keys to a file.")
-
-            if task_to_do == 1:
-                break
-
-            logger.info(f"Sleeping for {config['LAUNCH_TIME']} hours and starting again...")
-
-            time.sleep(config['LAUNCH_TIME'] * 60 * 60)
-            time.sleep(15)
-
+        logger.success("Saved accounts and private keys to a file.")
+        return
 
     else:
         if not use_proxy:
@@ -70,23 +65,14 @@ def start():
         elif len(proxies) < len(private_keys):
             proxies = [proxies[i % len(proxies)] for i in range(len(private_keys))]
 
-    while True:
-        logger.info("Starting...")
-        with ThreadPoolExecutor(max_workers=threads) as executor:
-            executor.map(launch_wrapper, indexes, proxies, private_keys)
+    logger.info("Starting...")
+    with ThreadPoolExecutor(max_workers=threads) as executor:
+        executor.map(launch_wrapper, indexes, proxies, private_keys)
 
-        logger.success("Saved accounts and private keys to a file.")
-
-        if task_to_do == 1:
-            break
-
-        logger.info(f"Sleeping for {config['LAUNCH_TIME']} hours and starting again...")
-
-        time.sleep(config['LAUNCH_TIME'] * 60 * 60)
-        time.sleep(15)
+    logger.success("Saved accounts and private keys to a file.")
 
 
-def account_flow(lock: threading.Lock, account_index: int, proxy: str, private_key: str, config: dict, task_to_do: int):
+def account_flow(lock: threading.Lock, account_index: int, proxy: str, private_key: str, config: dict):
     try:
         xterio_instance = model.xterio.Xterio(private_key, proxy, config)
 
@@ -94,15 +80,9 @@ def account_flow(lock: threading.Lock, account_index: int, proxy: str, private_k
         if not ok:
             raise Exception("unable to init xterio instance")
 
-        if task_to_do == 1:
-            ok = wrapper(xterio_instance.register_account, 1)
-            if not ok:
-                raise Exception("registration failed")
-
-        if task_to_do == 2:
-            ok = wrapper(xterio_instance.daily_actions, 1)
-            if not ok:
-                raise Exception("registration failed")
+        ok = wrapper(xterio_instance.daily_actions, 1)
+        if not ok:
+            raise Exception("check the logs")
 
         with lock:
             with open("data/success_data.txt", "a") as f:
@@ -111,7 +91,7 @@ def account_flow(lock: threading.Lock, account_index: int, proxy: str, private_k
     except Exception as err:
         logger.error(f"{account_index} | Account flow failed: {err}")
         with lock:
-            report_failed_key(private_key, lock, proxy)
+            report_failed_key(private_key, proxy)
 
 
 def wrapper(function, attempts: int, *args, **kwargs):
@@ -127,12 +107,10 @@ def wrapper(function, attempts: int, *args, **kwargs):
     return result
 
 
-def report_failed_key(private_key: str, lock: threading.Lock, proxy: str):
+def report_failed_key(private_key: str, proxy: str):
     try:
-        with lock:
-            with open("data/failed_keys.txt", "a") as file:
-                file.write(private_key + ":" + proxy + "\n")
-                return
+        with open("data/failed_keys.txt", "a") as file:
+            file.write(private_key + ":" + proxy + "\n")
 
     except Exception as err:
         logger.error(f"Error while reporting failed account: {err}")
