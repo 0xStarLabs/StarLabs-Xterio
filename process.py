@@ -117,7 +117,7 @@ def report_failed_key(private_key: str, proxy: str):
 
 
 def mobile_proxy_wrapper(data):
-    proxy, ip_change_link, mobile_proxy_queue, config, lock, private_keys, task_to_do = data[:7]
+    proxy, ip_change_link, mobile_proxy_queue, config, lock, private_keys = data[:7]
 
     while not mobile_proxy_queue.empty():
         i = mobile_proxy_queue.get()
@@ -137,7 +137,7 @@ def mobile_proxy_wrapper(data):
                     logger.error(f"{i + 1} | Mobile proxy error! Check your ip change link: {err}")
                     time.sleep(2)
 
-            account_flow(lock, i+1, proxy, private_keys[i], config, task_to_do)
+            account_flow(lock, i+1, proxy, private_keys[i], config)
 
         except Exception as err:
             logger.error(f"{i + 1} | Mobile proxy flow error: {err}")

@@ -1,2 +1,2 @@
-0xprivatekey
+private_key
 mnemo words

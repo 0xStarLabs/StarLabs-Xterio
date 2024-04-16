@@ -707,16 +707,17 @@ class Xterio:
         return False, True
 
     def vote(self, ticket_num: int, index=0) -> bool:
-        for _ in range(2):
-            current_ticket_amount = ticket_num
+        for _ in range(5):
+            contract_address = Web3.to_checksum_address(constants.PALIO_VOTER_ADDRESS)
+            contract = self.xter_w3.eth.contract(address=contract_address, abi=self.config['abi']['palio_voter']['abi'])
 
-            while current_ticket_amount > 0:
-                current_ticket_amount -= 1
+            voted_amount = contract.functions.userVotedAmt(self.address).call()
 
+            if ticket_num > voted_amount:
                 try:
                     json_data = {
                         'index': index,
-                        'num': current_ticket_amount,
+                        'num': ticket_num - voted_amount,
                     }
 
                     response = self.client.post(f'https://api.xter.io/palio/v1/user/{self.address}/vote', json=json_data)
@@ -727,20 +728,20 @@ class Xterio:
                         raise Exception(res)
 
                     else:
-                        ok, enough = self.vote_onchain(res['data'])
+                        ok = self.vote_onchain(res['data'])
                         if ok:
-                            logger.success(f"{self.address} | Voting was successful")
+                            logger.success(f"{self.address} | Getting the polling parameters was successful")
                             return True
 
                         else:
-                            if not enough:
-                                continue
-                            else:
-                                raise Exception(res)
+                            raise Exception(res)
 
                 except Exception as err:
                     logger.error(f'{self.address} | Failed to vote: {err}')
-
+            else:
+                logger.success(f"{self.address} | All votes has been cast")
+                return True
+            
         return False
 
     def claim_chat_nft(self) -> bool:
