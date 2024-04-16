@@ -179,7 +179,7 @@ class Xterio:
 
                 tasks = True
 
-                social_task_ids = [13, 14, 17, 11, 15, 16, 12]
+                social_task_ids = [13, 14, 17, 11, 15, 12]
                 for social_task_id in social_task_ids:
                     ok = self.report(social_task_id)
                     if not ok:
