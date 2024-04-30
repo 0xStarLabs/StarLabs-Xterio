@@ -80,7 +80,11 @@ def account_flow(lock: threading.Lock, account_index: int, proxy: str, private_k
         if not ok:
             raise Exception("unable to init xterio instance")
 
-        ok = wrapper(xterio_instance.daily_actions, 1)
+        ok = wrapper(xterio_instance.perform_incubation, 1)
+        if not ok:
+            raise Exception("check the logs")
+
+        ok = wrapper(xterio_instance.mint_nft, 1)
         if not ok:
             raise Exception("check the logs")
 
