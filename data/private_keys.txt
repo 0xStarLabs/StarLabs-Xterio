@@ -1,2 +1,1 @@
 private_key
-mnemo words

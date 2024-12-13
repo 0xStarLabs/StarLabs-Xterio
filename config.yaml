@@ -4,11 +4,19 @@ attempts: 1
 # use accounts in random order - true / false
 shuffle_accounts: false
 
-# RPCs, change if you want
-ETH_RPC: "https://eth.llamarpc.com"
+# invite codes. bot takes it random from this list
+# example: invite_codes: ["123456", "123457", "123458"]
+# by default invite_codes: [""]
+invite_codes: [""]
 
-# Bot will wait until ethereum gas is lower than number below
-MAX_GAS: 25
+# RPCs, change if you want
+XTERIO_RPC: "https://xterio-bnb.alt.technology"
+
+# pause between tasks in seconds
+pause_between_tasks: [2, 5]
+
+# pause between accounts in seconds
+pause_between_accounts: [10, 20]
 
 # mobile proxy (yes or no)
 mobile_proxy: "no"

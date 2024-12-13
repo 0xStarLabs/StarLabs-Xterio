@@ -1,5 +1,4 @@
 import json
-from configparser import ConfigParser
 
 import yaml
 from loguru import logger

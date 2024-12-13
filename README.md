@@ -22,21 +22,10 @@
 
 🟢 Аккаунты в формате мнемо фразы или приватный ключ
 
-🟢 Бесконечный цикл (можно указать как часто запускается скрипт)
-
 🟢 Реферальный код
 
-🟢 Регистрация новых аккаунтов
+🟢 Поддержка всех квестов
 
-🟢 Ежедневные квесты
-
-🟢 Бридж из BNB в Xterio
-
-🟢 Кормежка яйца
-
-🟢 Клейм яиц и ютилити
-
-🟢 Голосование
 
 
 ## 🚀 Installation
@@ -62,8 +51,6 @@ python main.py
 | referral_code | Реферальный код |
 | attempts | Максимальное количество попыток при выполнении задания |
 | XTERIO_RPC | Xterio RPC |
-| BSC_RPC | BSC RPC |
-| LAUNCH_TIME | Как часто запускать скрипт в часах |
 | mobile_proxy | Мобильные прокси |
 | change_ip_pause | Пауза после смены айпи мобильных прокси |
 
@@ -73,7 +60,7 @@ python main.py
 
 | Name | Description |
 | --- | --- |
-| accounts.txt | Содержит аккаунты (приватный ключ или мнемо фраза) |
+| private_keys.txt | Содержит аккаунты (приватный ключ или мнемо фраза) |
 | proxies.txt | Содержит прокси в формате user:pass@ip:port |
 | ip_change_links.txt | Содержит ссылки для смены айпи мобильных прокси |
 
@@ -91,19 +78,9 @@ python main.py
 
 🟢 Accounts in mnemo phrase or private key format
 
-🟢 Infinite loop (you can specify how often the script is run)
-
 🟢 Referral code
 
-🟢 Register new accounts
-
-🟢 Daily quests
-
-🟢 Bridge from BNB to Xterio
-
-🟢 Eggs and Utility Clues
-
-🟢 Voting
+🟢 All quests
 
 ## 🚀 Installation
 ```
@@ -125,8 +102,6 @@ python main.py
 | referral_code | referral code |
 | attempts | maximum number of attempts to complete the task |
 | XTERIO_RPC | Xterio RPC |
-| BSC_RPC | BSC RPC |
-| LAUNCH_TIME | how often to run the script in hours |
 | mobile_proxy | mobile proxies (yes or no) |
 | change_ip_pause | pause after changing the IP of mobile proxies |
 
@@ -138,7 +113,7 @@ The data is in the data folder:
 
 | Name | Description |
 | --- | --- |
-| accounts.txt | Contains accounts (private key or mnemo phrase) |
+| private_keys.txt | Contains accounts (private key or mnemo phrase) |
 | proxies.txt | Contains proxies in the format user:pass@ip:port |
 | ip_change_links.txt | Contains links to change mobile proxy IPs |
 
