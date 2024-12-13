@@ -10,7 +10,7 @@ shuffle_accounts: false
 invite_codes: [""]
 
 # RPCs, change if you want
-XTERIO_RPC: "https://xterio-bnb.alt.technology"
+XTERIO_RPC: "https://xterio.alt.technology"
 
 # pause between tasks in seconds
 pause_between_tasks: [2, 5]
