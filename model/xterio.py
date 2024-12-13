@@ -14,6 +14,7 @@ from extra.converter import mnemonic_to_private_key
 from model import constants
 from data import chat_messages
 
+
 class Xterio:
     def __init__(self, private_key, proxy, config):
         self.private_key = private_key
@@ -79,22 +80,39 @@ class Xterio:
                     if not result:
                         continue
                 logger.info(f"{self.address} | Completed {task['ID']} mission.")
-            
-            time.sleep(random.randint(self.config["pause_between_tasks"][0], self.config["pause_between_tasks"][1]))
+
+            time.sleep(
+                random.randint(
+                    self.config["pause_between_tasks"][0],
+                    self.config["pause_between_tasks"][1],
+                )
+            )
 
         tasks = self._get_tasks()
         for task in tasks["list"]:
             if task["user_task"]:
                 if not task["user_task"][-1]["tx_hash"]:
                     result = self.claim_mission(task["ID"])
-                if result:
-                    logger.success(f"{self.address} | Completed claim ai mission.")
-                else:
-                    logger.error(f"{self.address} | Failed to claim ai mission.")
-                time.sleep(random.randint(self.config["pause_between_tasks"][0], self.config["pause_between_tasks"][1]))
+                    if result:
+                        logger.success(
+                            f"{self.address} | Completed claim {task['ID']} mission."
+                        )
+                    else:
+                        logger.error(
+                            f"{self.address} | Failed to claim {task['ID']} mission."
+                        )
+
+                time.sleep(
+                    random.randint(
+                        self.config["pause_between_tasks"][0],
+                        self.config["pause_between_tasks"][1],
+                    )
+                )
+
+        self.claim_chat_score()
 
         return True
-    
+
     def claim_mission(self, task_id):
         try:
             contract_address = Web3.to_checksum_address(
@@ -180,6 +198,97 @@ class Xterio:
             logger.error(f"{self.address} | Failed to claim mission: {err}")
             return False
 
+    def claim_chat_score(self):
+        try:
+            response = self.client.get("https://api.xter.io/ai/v1/user/chat")
+            if response.json()["err_code"] != 0:
+                raise Exception(response.text)
+            else:
+                claim_status = response.json()["data"]["claim_status"]
+                if claim_status == 2:
+                    logger.info(f"{self.address} | Already claimed chat score")
+                    return True
+
+            contract_address = Web3.to_checksum_address(
+                "0x7bb85350e3a883A1708648AB7e37cEf4651cFd48"
+            )
+
+            # Generate function call data
+            function_selector = "0x31bf7fe8"
+            # Pad walletType (1) to 32 bytes
+            wallet_type = hex(1)[2:].zfill(64)
+            # Combine function selector and parameter
+            data = function_selector + wallet_type
+
+            # Get current nonce including pending transactions
+            pending_nonce = self.eth_w3.eth.get_transaction_count(
+                self.address, "pending"
+            )
+            latest_nonce = self.eth_w3.eth.get_transaction_count(self.address, "latest")
+            nonce = max(pending_nonce, latest_nonce)
+
+            # Get gas estimate
+            gas_estimate = self.eth_w3.eth.estimate_gas(
+                {"from": self.address, "to": contract_address, "data": data, "value": 0}
+            )
+
+            # Calculate gas parameters
+            recommended_base_fee = self.eth_w3.eth.fee_history(
+                block_count=1, newest_block="latest"
+            )["baseFeePerGas"][0]
+            max_priority_fee_per_gas = self.eth_w3.to_wei(2, "gwei")
+            max_fee_per_gas = recommended_base_fee + max_priority_fee_per_gas
+
+            transaction = {
+                "chainId": 112358,
+                "from": self.address,
+                "to": contract_address,
+                "value": 0,
+                "data": data,
+                "nonce": nonce,
+                "type": "0x2",
+                "maxFeePerGas": max_fee_per_gas,
+                "maxPriorityFeePerGas": max_priority_fee_per_gas,
+                "gas": int(gas_estimate * 1.15),
+            }
+
+            signed_transaction = self.eth_w3.eth.account.sign_transaction(
+                transaction, private_key=self.private_key
+            )
+
+            tx_hash = self.eth_w3.eth.send_raw_transaction(
+                signed_transaction.raw_transaction
+            )
+            receipt = self.eth_w3.eth.wait_for_transaction_receipt(tx_hash)
+
+            if receipt.status != 1:
+                raise Exception(f"Transaction failed: {tx_hash.hex()}")
+            else:
+                logger.success(f"{self.address} | Successfully claimed chat score")
+                return True
+
+            # tx = "0x" + tx_hash.hex()
+
+            # json_data = {
+            #     "eventType": "AiCampaign::*",
+            #     "network": "XTERIO",
+            #     "txHash": tx,
+            # }
+
+            # response = self.client.post(
+            #     "https://api.xter.io/baas/v1/event/trigger", json=json_data
+            # )
+            # print(response.text)
+            # if response.json()["err_code"] != 0:
+            #     raise Exception(response.text)
+            # else:
+            #     logger.success(f"{self.address} | Successfully claimed chat score")
+
+            # return True
+        except Exception as err:
+            logger.error(f"{self.address} | Failed to claim chat score: {err}")
+            return False
+
     def complete_task(self, task_id):
         try:
             json_data = {
@@ -206,12 +315,14 @@ class Xterio:
             )
 
             if response.json()["err_code"] != 0:
-                if response.json()['err_code'] == 10003:
-                    logger.info(f"{self.address} | Already applied invite code: {ref_code}")
+                if response.json()["err_code"] == 10003:
+                    logger.info(
+                        f"{self.address} | Already applied invite code: {ref_code}"
+                    )
                     return True
                 raise Exception(response.text)
             else:
-                
+
                 logger.success(f"{self.address} | Applied invite code: {ref_code}")
                 return True
 
@@ -231,11 +342,12 @@ class Xterio:
                 )
 
                 if "error" in response.text:
-                    logger.error(f"{self.address} | Failed to send chat message: {response.text}")                    
+                    logger.error(
+                        f"{self.address} | Failed to send chat message: {response.text}"
+                    )
                 else:
                     logger.success(f"{self.address} | Sent chat message: {message}")
 
-                
                 time.sleep(random.randint(3, 6))
 
         except Exception as err:
