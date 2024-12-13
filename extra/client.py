@@ -4,7 +4,7 @@ from model.constants import USER_AGENT
 
 
 def create_client(proxy: str) -> requests.Session:
-    session = requests.Session(impersonate="chrome124", timeout=60)
+    session = requests.Session(impersonate="chrome124", timeout=120)
 
     if proxy:
         session.proxies.update(
