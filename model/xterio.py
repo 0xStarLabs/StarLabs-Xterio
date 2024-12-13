@@ -79,16 +79,19 @@ class Xterio:
                     if not result:
                         continue
                 logger.info(f"{self.address} | Completed {task['ID']} mission.")
+            
+            time.sleep(random.randint(self.config["pause_between_tasks"][0], self.config["pause_between_tasks"][1]))
 
+        tasks = self._get_tasks()
+        for task in tasks["list"]:
             if task["user_task"]:
                 if not task["user_task"][-1]["tx_hash"]:
                     result = self.claim_mission(task["ID"])
-                    if result:
-                        logger.success(f"{self.address} | Completed claim ai mission.")
-                    else:
-                        logger.error(f"{self.address} | Failed to claim ai mission.")
-            
-            time.sleep(random.randint(self.config["pause_between_tasks"][0], self.config["pause_between_tasks"][1]))
+                if result:
+                    logger.success(f"{self.address} | Completed claim ai mission.")
+                else:
+                    logger.error(f"{self.address} | Failed to claim ai mission.")
+                time.sleep(random.randint(self.config["pause_between_tasks"][0], self.config["pause_between_tasks"][1]))
 
         return True
     
@@ -100,9 +103,12 @@ class Xterio:
 
             # Generate function call data with task_id
             function_selector = "0xdc7d41f6"
+            # Pad task_id to 32 bytes
             padded_task_id = hex(task_id)[2:].zfill(64)
-            trailing_zeros = "0" * 64
-            data = function_selector + padded_task_id + trailing_zeros
+            # Pad walletType (1) to 32 bytes
+            wallet_type = hex(1)[2:].zfill(64)
+            # Combine function selector and parameters
+            data = function_selector + padded_task_id + wallet_type
 
             # Get current nonce including pending transactions
             pending_nonce = self.eth_w3.eth.get_transaction_count(
@@ -157,7 +163,7 @@ class Xterio:
             json_data = {
                 "task_id": task_id,
                 "tx_hash": tx,
-                "is_by_bit": 0,
+                "is_by_bit": 1,
             }
 
             response = self.client.post(
@@ -167,7 +173,7 @@ class Xterio:
             if response.json()["err_code"] != 0:
                 raise Exception(response.text)
             else:
-                logger.success(f"{self.address} | Complete claim ai mission.")
+                logger.success(f"{self.address} | Complete claim {task_id} mission.")
                 return True
 
         except Exception as err:
@@ -287,7 +293,7 @@ class Xterio:
                 "address": self.address,
                 "type": "eth",
                 "sign": "0x" + signature,
-                "provider": "METAMASK",
+                "provider": "BYBIT",
                 "invite_code": "",
             }
             response = self.client.post(
