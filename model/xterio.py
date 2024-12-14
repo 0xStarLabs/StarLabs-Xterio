@@ -70,23 +70,27 @@ class Xterio:
                     ref_code = random.choice(self.config["invite_codes"])
                     if ref_code:
                         self.apply_invite_code(ref_code)
-            
+
             if task["ID"] == 11:
                 if not task["user_task"]:
                     self.send_chat_messages()
                 else:
                     data = task["user_task"][-1]
-                    updated = data['UpdatedAt']
-                    date_obj = datetime.datetime.strptime(updated, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
+                    updated = data["UpdatedAt"]
+                    date_obj = datetime.datetime.strptime(
+                        updated, "%Y-%m-%dT%H:%M:%SZ"
+                    ).replace(tzinfo=datetime.timezone.utc)
 
                     # Получаем текущее время в UTC
                     now_utc = datetime.datetime.now(datetime.timezone.utc)
 
-                    yesterday_start = (now_utc - datetime.timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+                    yesterday_start = (now_utc - datetime.timedelta(days=1)).replace(
+                        hour=0, minute=0, second=0, microsecond=0
+                    )
                     yesterday_end = yesterday_start + datetime.timedelta(days=1)
 
                     is_yesterday = yesterday_start <= date_obj < yesterday_end
-                    
+
                     if is_yesterday:
                         self.send_chat_messages()
                         time.sleep(random.randint(5, 8))
@@ -99,17 +103,21 @@ class Xterio:
                         continue
                 elif task["ID"] == 18 and task["user_task"]:
                     data = task["user_task"][-1]
-                    updated = data['UpdatedAt']
-                    date_obj = datetime.datetime.strptime(updated, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
+                    updated = data["UpdatedAt"]
+                    date_obj = datetime.datetime.strptime(
+                        updated, "%Y-%m-%dT%H:%M:%SZ"
+                    ).replace(tzinfo=datetime.timezone.utc)
 
                     # Получаем текущее время в UTC
                     now_utc = datetime.datetime.now(datetime.timezone.utc)
 
-                    yesterday_start = (now_utc - datetime.timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+                    yesterday_start = (now_utc - datetime.timedelta(days=1)).replace(
+                        hour=0, minute=0, second=0, microsecond=0
+                    )
                     yesterday_end = yesterday_start + datetime.timedelta(days=1)
 
                     is_yesterday = yesterday_start <= date_obj < yesterday_end
-                    
+
                     if is_yesterday:
                         result = self.complete_task(task["ID"])
                         if not result:
@@ -180,7 +188,7 @@ class Xterio:
             recommended_base_fee = self.eth_w3.eth.fee_history(
                 block_count=1, newest_block="latest"
             )["baseFeePerGas"][0]
-            max_priority_fee_per_gas = self.eth_w3.to_wei(2, "gwei")
+            max_priority_fee_per_gas = self.eth_w3.to_wei(0.002, "gwei")
             max_fee_per_gas = recommended_base_fee + max_priority_fee_per_gas
 
             transaction = {
@@ -272,7 +280,7 @@ class Xterio:
             recommended_base_fee = self.eth_w3.eth.fee_history(
                 block_count=1, newest_block="latest"
             )["baseFeePerGas"][0]
-            max_priority_fee_per_gas = self.eth_w3.to_wei(2, "gwei")
+            max_priority_fee_per_gas = self.eth_w3.to_wei(0.002, "gwei")
             max_fee_per_gas = recommended_base_fee + max_priority_fee_per_gas
 
             transaction = {
