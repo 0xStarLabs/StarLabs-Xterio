@@ -1,3 +1,4 @@
+import datetime
 import random
 import time
 import requests as default_requests
@@ -69,16 +70,51 @@ class Xterio:
                     ref_code = random.choice(self.config["invite_codes"])
                     if ref_code:
                         self.apply_invite_code(ref_code)
-
+            
             if task["ID"] == 11:
                 if not task["user_task"]:
                     self.send_chat_messages()
+                else:
+                    data = task["user_task"][-1]
+                    updated = data['UpdatedAt']
+                    date_obj = datetime.datetime.strptime(updated, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
+
+                    # Получаем текущее время в UTC
+                    now_utc = datetime.datetime.now(datetime.timezone.utc)
+
+                    yesterday_start = (now_utc - datetime.timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+                    yesterday_end = yesterday_start + datetime.timedelta(days=1)
+
+                    is_yesterday = yesterday_start <= date_obj < yesterday_end
+                    
+                    if is_yesterday:
+                        self.send_chat_messages()
+                        time.sleep(random.randint(5, 8))
+                        self.claim_mission(task["ID"])
 
             if task["ID"] in [18, 20, 21, 22, 23, 24]:
                 if not task["user_task"]:
                     result = self.complete_task(task["ID"])
                     if not result:
                         continue
+                elif task["ID"] == 18 and task["user_task"]:
+                    data = task["user_task"][-1]
+                    updated = data['UpdatedAt']
+                    date_obj = datetime.datetime.strptime(updated, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
+
+                    # Получаем текущее время в UTC
+                    now_utc = datetime.datetime.now(datetime.timezone.utc)
+
+                    yesterday_start = (now_utc - datetime.timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+                    yesterday_end = yesterday_start + datetime.timedelta(days=1)
+
+                    is_yesterday = yesterday_start <= date_obj < yesterday_end
+                    
+                    if is_yesterday:
+                        result = self.complete_task(task["ID"])
+                        if not result:
+                            continue
+
                 logger.info(f"{self.address} | Completed {task['ID']} mission.")
 
             time.sleep(
@@ -337,7 +373,7 @@ class Xterio:
 
                 json_data = {"answer": message, "lang": "en"}
                 response = self.client.post(
-                    "https://qfjmoammgfpnbqgpsklscoz4su0afwdz.lambda-url.eu-central-1.on.aws/",
+                    "https://api.xter.io/ai/v1/chat",
                     json=json_data,
                 )
 
