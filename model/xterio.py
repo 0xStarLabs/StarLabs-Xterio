@@ -84,12 +84,12 @@ class Xterio:
                     # Получаем текущее время в UTC
                     now_utc = datetime.datetime.now(datetime.timezone.utc)
 
-                    yesterday_start = (now_utc - datetime.timedelta(days=1)).replace(
+                    today_start = now_utc.replace(
                         hour=0, minute=0, second=0, microsecond=0
                     )
-                    yesterday_end = yesterday_start + datetime.timedelta(days=1)
 
-                    is_yesterday = yesterday_start <= date_obj < yesterday_end
+                    # Если date_obj меньше начала текущего дня, значит обновление было не сегодня
+                    is_yesterday = date_obj < today_start
 
                     if is_yesterday:
                         self.send_chat_messages()
@@ -111,12 +111,12 @@ class Xterio:
                     # Получаем текущее время в UTC
                     now_utc = datetime.datetime.now(datetime.timezone.utc)
 
-                    yesterday_start = (now_utc - datetime.timedelta(days=1)).replace(
+                    today_start = now_utc.replace(
                         hour=0, minute=0, second=0, microsecond=0
                     )
-                    yesterday_end = yesterday_start + datetime.timedelta(days=1)
 
-                    is_yesterday = yesterday_start <= date_obj < yesterday_end
+                    # Если date_obj меньше начала текущего дня, значит обновление было не сегодня
+                    is_yesterday = date_obj < today_start
 
                     if is_yesterday:
                         result = self.complete_task(task["ID"])
