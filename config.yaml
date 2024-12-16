@@ -1,3 +1,10 @@
+# captcha api key
+captcha_api_key: ""
+
+# proxies for captcha solver. format user:pass@ip:port. by default it's ""
+# recommended to use static proxies, just in case it doesn't work without proxies
+captcha_proxy: ""
+
 # number of retries
 attempts: 1
 

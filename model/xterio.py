@@ -1,6 +1,7 @@
 import datetime
 import random
 import time
+import traceback
 import requests as default_requests
 from loguru import logger
 from eth_account import Account
@@ -14,6 +15,7 @@ from extra.client import create_client
 from extra.converter import mnemonic_to_private_key
 from model import constants
 from data import chat_messages
+from model.captcha_solver import CaptchaSolver
 
 
 class Xterio:
@@ -25,6 +27,8 @@ class Xterio:
         self.eth_w3: Web3 | None = None
         self.address: ChecksumAddress | None = None
         self.client: requests.Session | None = None
+
+        self.is_captcha_solved_for_chat = False
 
     def init_instance(self):
         for _ in range(5):
@@ -64,6 +68,7 @@ class Xterio:
 
     def complete_all_tasks(self):
         tasks = self._get_tasks()
+
         for task in tasks["list"]:
             if task["ID"] == 16:
                 if not task["user_task"]:
@@ -245,6 +250,7 @@ class Xterio:
     def claim_chat_score(self):
         try:
             response = self.client.get("https://api.xter.io/ai/v1/user/chat")
+            input(response.text)
             if response.json()["err_code"] != 0:
                 raise Exception(response.text)
             else:
@@ -379,7 +385,36 @@ class Xterio:
             for _ in range(3):
                 message = random.choice(chat_messages.CHAT_MESSAGES)
 
-                json_data = {"answer": message, "lang": "en"}
+                json_data = {
+                    "answer": message,
+                    "lang": "en",
+                }
+
+                if not self.is_captcha_solved_for_chat:
+                    sitekey = "2032769e-62c0-4304-87e4-948e81367fba"
+                    pageurl = "https://app.xter.io/activities/ai-campaign"
+                    proxy = self.config["captcha_proxy"]
+                    api_key = self.config["captcha_api_key"]
+
+                    logger.info(f"{self.address} | Solving captcha for chat messages")
+
+                    solver = CaptchaSolver(
+                        base_url="http://77.232.42.230:8000",
+                        proxy=self.config["captcha_proxy"],
+                        api_key=api_key,
+                    )
+                    
+                    result = solver.solve_hcaptcha(sitekey, pageurl)
+                    if result:
+                        logger.success(f"{self.address} | Captcha solved for chat")
+                    else:
+                        logger.error(
+                            f"{self.address} | Failed to solve captcha for chat"
+                        )
+                        continue
+
+                    json_data["h-recaptcha-response"] = result.strip()
+
                 response = self.client.post(
                     "https://api.xter.io/ai/v1/chat",
                     json=json_data,
@@ -391,10 +426,12 @@ class Xterio:
                     )
                 else:
                     logger.success(f"{self.address} | Sent chat message: {message}")
+                    self.is_captcha_solved_for_chat = True
 
                 time.sleep(random.randint(3, 6))
 
         except Exception as err:
+            traceback.print_exc()
             logger.error(f"{self.address} | Failed to send chat message: {err}")
             return False
 
