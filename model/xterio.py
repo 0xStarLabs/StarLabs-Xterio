@@ -250,7 +250,7 @@ class Xterio:
     def claim_chat_score(self):
         try:
             response = self.client.get("https://api.xter.io/ai/v1/user/chat")
-            input(response.text)
+
             if response.json()["err_code"] != 0:
                 raise Exception(response.text)
             else:
