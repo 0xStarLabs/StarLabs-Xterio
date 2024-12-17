@@ -393,25 +393,26 @@ class Xterio:
                 if not self.is_captcha_solved_for_chat:
                     sitekey = "2032769e-62c0-4304-87e4-948e81367fba"
                     pageurl = "https://app.xter.io/activities/ai-campaign"
-                    proxy = self.config["captcha_proxy"]
-                    api_key = self.config["captcha_api_key"]
 
                     logger.info(f"{self.address} | Solving captcha for chat messages")
 
                     solver = CaptchaSolver(
-                        base_url="http://77.232.42.230:8000",
                         proxy=self.config["captcha_proxy"],
-                        api_key=api_key,
+                        api_key=self.config["captcha_api_key"],
                     )
-                    
-                    result = solver.solve_hcaptcha(sitekey, pageurl)
-                    if result:
-                        logger.success(f"{self.address} | Captcha solved for chat")
-                    else:
-                        logger.error(
-                            f"{self.address} | Failed to solve captcha for chat"
-                        )
-                        continue
+
+                    for _ in range(3):
+                        result = solver.solve_hcaptcha(sitekey, pageurl)
+                        if result:
+                            logger.success(f"{self.address} | Captcha solved for chat")
+                            break
+                        else:
+                            logger.error(
+                                f"{self.address} | Failed to solve captcha for chat"
+                            )
+
+                    if not result:
+                        raise Exception("failed to solve captcha for chat 3 times")
 
                     json_data["h-recaptcha-response"] = result.strip()
 

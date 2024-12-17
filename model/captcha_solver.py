@@ -1,3 +1,4 @@
+import time
 from loguru import logger
 import requests
 from typing import Optional, Dict
@@ -6,7 +7,7 @@ from typing import Optional, Dict
 class CaptchaSolver:
     def __init__(
         self,
-        base_url: str = "http://77.232.42.230:8000",
+        base_url: str = "https://www.google.com",
         proxy: str = "",
         api_key: str = "",
     ):
@@ -18,21 +19,36 @@ class CaptchaSolver:
         return {"http": f"http://{proxy}", "https": f"http://{proxy}"}
 
     def solve_hcaptcha(self, sitekey: str, pageurl: str) -> Optional[str]:
-        url = f"{self.base_url}/solve_captcha"
-        data = {
-            "sitekey": sitekey,
-            "pageurl": pageurl,
-            "api_key": self.api_key,
-            "proxy": "",
+        url = f"{self.base_url}/solve"
+        headers = {
+            "Content-Type": "application/json",
+            "X-API-Key": self.api_key,
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         }
+        data = {"sitekey": sitekey, "pageurl": pageurl}
 
         try:
-            response = requests.post(url, json=data, proxies=self.proxy, timeout=300)
-            if response.status_code == 200:
-                result = response.json()
-                return result.get("token")
-            logger.error(f"Failed to solve captcha: {response.text}")
+            for _ in range(3):
+                response = requests.post(
+                    url, headers=headers, json=data, proxies=self.proxy, timeout=600
+                )
+
+                if "Invalid or expired API key" in response.text:
+                    logger.error("Invalid or expired API key for captcha solver")
+                    break
+
+                if "Too many requests" in response.text:
+                    logger.error(
+                        "Too many requests for captcha solver, waiting 5 seconds..."
+                    )
+                    time.sleep(5)
+                    continue
+
+                if response.status_code == 200:
+                    result = response.json()
+                    return result.get("token")
+
             return None
-        except requests.RequestException as e:
+        except Exception as e:
             logger.error(f"Error solving captcha: {e}")
             return None
