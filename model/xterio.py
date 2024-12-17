@@ -449,7 +449,8 @@ class Xterio:
 
         except Exception as err:
             logger.error(f"{self.address} | Failed to get tasks: {err}")
-
+            raise err
+        
     def _get_challenge(self) -> str:
         for _ in range(5):
             try:

@@ -16,6 +16,11 @@ def start():
     extra.show_dev_info()
 
     def launch_wrapper(index, proxy, private_key):
+        if index <= threads:
+            delay = random.uniform(1, threads)
+            logger.info(f"Thread {index} starting with delay {delay:.1f}s")
+            time.sleep(delay)
+        
         account_flow(lock, index, proxy, private_key, config)
 
     threads = int(input("\nHow many threads do you want: ").strip())
