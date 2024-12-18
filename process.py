@@ -110,7 +110,8 @@ def account_flow(
                 with lock:
                     with open("data/invite_codes.txt", "a") as f:
                         f.write(f"{private_key}|{invite_code}\n") 
-
+            return
+        
         ok = wrapper(xterio_instance.complete_all_tasks, 1)
         if not ok:
             raise Exception("unable to complete all tasks")
