@@ -48,7 +48,7 @@ class CaptchaSolver:
 
         try:
             response = requests.post(
-                f"{self.base_url}/captcha/hcaptcha", json=data, timeout=30
+                f"{self.base_url}/captcha/hcaptcha", json=data, timeout=30, verify=False
             ).json()
 
             if "id" in response:
@@ -69,7 +69,7 @@ class CaptchaSolver:
         for _ in range(max_attempts):
             try:
                 response = requests.get(
-                    f"{self.base_url}/captcha/{task_id}", params=params, timeout=30
+                    f"{self.base_url}/captcha/{task_id}", params=params, timeout=30, verify=False
                 )
                 result = response.json()
 
