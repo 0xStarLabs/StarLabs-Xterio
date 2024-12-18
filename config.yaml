@@ -19,6 +19,9 @@ shuffle_accounts: false
 # by default invite_codes: [""]
 invite_codes: [""]
 
+# Collect invite codes: true / false
+collect_invite_codes: false
+
 # RPCs, change if you want
 BNB_RPC: "https://binance.llamarpc.com"
 XTERIO_RPC: "https://xterio.alt.technology"

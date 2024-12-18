@@ -67,6 +67,7 @@ class Xterio:
         return False
 
     def complete_all_tasks(self):
+
         tasks = self._get_tasks()
 
         for task in tasks["list"]:
@@ -435,6 +436,20 @@ class Xterio:
             traceback.print_exc()
             logger.error(f"{self.address} | Failed to send chat message: {err}")
             return False
+
+    def collect_invite_code(self):
+        try:
+            response = self.client.get("https://api.xter.io/ai/v1/user/invite/code")
+            if response.json()["err_code"] != 0:
+                raise Exception(response.text)
+            else:
+                code = response.json()["data"]["code"]
+                logger.success(f"{self.address} | Collected invite code: {code}")
+                return code
+            
+        except Exception as err:
+            logger.error(f"{self.address} | Failed to collect invite code: {err}")
+            return ""
 
     def _get_tasks(self):
         try:

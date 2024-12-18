@@ -104,6 +104,13 @@ def account_flow(
         if not ok:
             raise Exception("unable to init xterio instance")
 
+        if config["collect_invite_codes"]:
+            invite_code = xterio_instance.collect_invite_code()
+            if invite_code:
+                with lock:
+                    with open("data/invite_codes.txt", "a") as f:
+                        f.write(f"{private_key}|{invite_code}\n") 
+
         ok = wrapper(xterio_instance.complete_all_tasks, 1)
         if not ok:
             raise Exception("unable to complete all tasks")
