@@ -35,5 +35,5 @@ change_ip_pause: 20
 
 # BRIDGE
 BRIDGE: "false"
-AMOUNT: [0.0005, 0.001]
+AMOUNT: [0.0015, 0.0025]
 
