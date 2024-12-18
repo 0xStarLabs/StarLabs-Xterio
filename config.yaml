@@ -20,6 +20,7 @@ shuffle_accounts: false
 invite_codes: [""]
 
 # RPCs, change if you want
+BNB_RPC: "https://binance.llamarpc.com"
 XTERIO_RPC: "https://xterio.alt.technology"
 
 # pause between tasks in seconds
@@ -31,3 +32,8 @@ pause_between_accounts: [10, 20]
 # mobile proxy (yes or no)
 mobile_proxy: "no"
 change_ip_pause: 20
+
+# BRIDGE
+BRIDGE: "false"
+AMOUNT: [0.0005, 0.001]
+

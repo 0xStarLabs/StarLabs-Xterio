@@ -510,3 +510,48 @@ class Xterio:
             logger.error(f"{self.address} | Failed to Sign in Xterio account: {err}")
 
         return False, False
+
+    def bridge_eth(self):
+        try:
+            # Get random amount between config values with random decimal places (8-18)
+            amount = round(random.uniform(self.config["AMOUNT"][0], self.config["AMOUNT"][1]), random.randint(8, 18))
+            amount_wei = Web3.to_wei(amount, 'ether')
+            bnb_w3 = Web3(Web3.HTTPProvider(self.config["BNB_RPC"]))
+            
+            contract_address = Web3.to_checksum_address(constants.CONTRACT_ADDRESS)
+            contract = bnb_w3.eth.contract(address=contract_address, abi=constants.CONTRACT_ABI)
+            
+            # Get current nonce including pending transactions
+            nonce = bnb_w3.eth.get_transaction_count(self.address, "latest")
+            # Build transaction using contract function
+            transaction = contract.functions.bridgeETHTo(
+                self.address,
+                200000,  # _minGasLimit
+                bytes.fromhex("7375706572627269646765")  # _extraData
+            ).build_transaction({
+                "from": self.address,
+                "value": amount_wei,
+                "nonce": nonce,
+                "gasPrice": bnb_w3.to_wei(1, 'gwei'),
+            })
+            # Estimate gas
+            gas_estimate = bnb_w3.eth.estimate_gas(transaction)
+            transaction['gas'] = int(gas_estimate * 1.15)  # Add 15% buffer
+            
+            signed_transaction = bnb_w3.eth.account.sign_transaction(
+                transaction, private_key=self.private_key
+            )
+            tx_hash = bnb_w3.eth.send_raw_transaction(signed_transaction.raw_transaction)
+            receipt = bnb_w3.eth.wait_for_transaction_receipt(tx_hash)
+
+            if receipt.status == 1:
+                logger.success(
+                    f"{self.address} | Successfully bridged {amount} BNB https://bscscan.com/tx/0x{tx_hash.hex()}"
+                )
+                return True
+            else:
+                raise Exception(f"Bridge transaction failed: {tx_hash.hex()}")
+
+        except Exception as err:
+            logger.error(f"{self.address} | Failed to bridge BNB: {err}")
+            return False

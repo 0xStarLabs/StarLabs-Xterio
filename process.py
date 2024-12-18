@@ -21,7 +21,10 @@ def start():
             logger.info(f"Thread {index} starting with delay {delay:.1f}s")
             time.sleep(delay)
         
-        account_flow(lock, index, proxy, private_key, config)
+        if config["BRIDGE"].lower() == "true":
+            bridge_flow(lock, index, proxy, private_key, config)
+        else:
+            account_flow(lock, index, proxy, private_key, config)
 
     threads = int(input("\nHow many threads do you want: ").strip())
 
@@ -47,43 +50,48 @@ def start():
 
     lock = threading.Lock()
 
-    if config["mobile_proxy"].lower() == "yes":
-        ip_change_links = extra.read_txt_file(
-            "ip change links", "data/ip_change_links.txt"
-        )
-
-        for i in range(len(private_keys)):
-            mobile_proxy_queue.put(i)
-        cycle = []
-        for i in range(len(proxies)):
-            data_list = (
-                proxies[i],
-                ip_change_links[i],
-                mobile_proxy_queue,
-                config,
-                lock,
-                private_keys,
-            )
-            cycle.append(data_list)
-
-        logger.info("Starting...")
-        with ThreadPoolExecutor() as executor:
-            executor.map(mobile_proxy_wrapper, cycle)
-
-        logger.success("Saved accounts and private keys to a file.")
-        return
-
-    else:
-        if not use_proxy:
-            proxies = ["" for _ in range(len(private_keys))]
-        elif len(proxies) < len(private_keys):
-            proxies = [proxies[i % len(proxies)] for i in range(len(private_keys))]
+    if not use_proxy:
+        proxies = ["" for _ in range(len(private_keys))]
+    elif len(proxies) < len(private_keys):
+        proxies = [proxies[i % len(proxies)] for i in range(len(private_keys))]
 
     logger.info("Starting...")
     with ThreadPoolExecutor(max_workers=threads) as executor:
         executor.map(launch_wrapper, indexes, proxies, private_keys)
 
     logger.success("Saved accounts and private keys to a file.")
+
+
+def bridge_flow(
+    lock: threading.Lock, account_index: int, proxy: str, private_key: str, config: dict
+):
+    try:
+        xterio_instance = model.xterio.Xterio(private_key, proxy, config)
+
+        ok = wrapper(xterio_instance.init_instance, 1)
+        if not ok:
+            raise Exception("unable to init xterio instance")
+
+        ok = wrapper(xterio_instance.bridge_eth, 1)
+        if not ok:
+            raise Exception("unable to complete bridge")
+        logger.success(f"{account_index} | Successfully completed bridge")
+
+        with lock:
+            with open("data/bridge_success.txt", "a") as f:
+                f.write(f"{private_key}:{proxy}\n")
+
+        time.sleep(
+            random.randint(
+                config["pause_between_accounts"][0], config["pause_between_accounts"][1]
+            )
+        )
+        logger.success(f"{account_index} | Bridge flow completed successfully")
+
+    except Exception as err:
+        logger.error(f"{account_index} | Bridge flow failed: {err}")
+        with lock:
+            report_failed_key(private_key, proxy)
 
 
 def account_flow(
