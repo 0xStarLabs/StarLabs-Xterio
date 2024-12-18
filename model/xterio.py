@@ -401,7 +401,7 @@ class Xterio:
                         api_key=self.config["captcha_api_key"],
                     )
 
-                    for _ in range(3):
+                    for _ in range(self.config["solve_captcha_attempts"]):
                         result = solver.solve_hcaptcha(sitekey, pageurl)
                         if result:
                             logger.success(f"{self.address} | Captcha solved for chat")
@@ -450,7 +450,7 @@ class Xterio:
         except Exception as err:
             logger.error(f"{self.address} | Failed to get tasks: {err}")
             raise err
-        
+
     def _get_challenge(self) -> str:
         for _ in range(5):
             try:

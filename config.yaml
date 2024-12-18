@@ -5,6 +5,9 @@ captcha_api_key: ""
 # recommended to use static proxies, just in case it doesn't work without proxies
 captcha_proxy: ""
 
+# attempts to solve captcha. by default it's 5
+solve_captcha_attempts: 5
+
 # number of retries
 attempts: 1
 

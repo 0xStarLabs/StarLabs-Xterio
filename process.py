@@ -24,8 +24,6 @@ def start():
         account_flow(lock, index, proxy, private_key, config)
 
     threads = int(input("\nHow many threads do you want: ").strip())
-    if threads > 20:
-        threads = 20
 
     config = extra.read_config()
     config["abi"] = extra.read_abi("extra/abi.json")
