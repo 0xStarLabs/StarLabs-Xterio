@@ -1,42 +1,52 @@
-# captcha api key
-captcha_api_key: ""
+captcha:
+  # captcha api key
+  captcha_api_key: ""
 
-# proxies for captcha solver. format user:pass@ip:port. by default it's ""
-# recommended to use static proxies, just in case it doesn't work without proxies
-captcha_proxy: ""
+  # proxies for captcha solver. format user:pass@ip:port. by default it's ""
+  # recommended to use static proxies, just in case it doesn't work without proxies
+  captcha_proxy: ""
 
-# attempts to solve captcha. by default it's 5
-solve_captcha_attempts: 5
+  # attempts to solve captcha. by default it's 5
+  solve_captcha_attempts: 5
 
-# number of retries
-attempts: 1
 
-# use accounts in random order - true / false
-shuffle_accounts: false
+settings:
+  # use accounts in random order - true / false
+  shuffle_accounts: false
 
-# invite codes. bot takes it random from this list
-# example: invite_codes: ["123456", "123457", "123458"]
-# by default invite_codes: [""]
-invite_codes: [""]
+  # pause between tasks in seconds
+  pause_between_tasks: [2, 5]
 
-# Collect invite codes: true / false
-collect_invite_codes: false
+  # pause between accounts in seconds
+  pause_between_accounts: [10, 20]
 
-# RPCs, change if you want
-BNB_RPC: "https://binance.llamarpc.com"
-XTERIO_RPC: "https://xterio.alt.technology"
 
-# pause between tasks in seconds
-pause_between_tasks: [2, 5]
+invite:
+  # invite codes. bot takes it random from this list
+  # example: invite_codes: ["123456", "123457", "123458"]
+  # by default invite_codes: [""]
+  invite_codes: [""]
 
-# pause between accounts in seconds
-pause_between_accounts: [10, 20]
 
-# mobile proxy (yes or no)
-mobile_proxy: "no"
-change_ip_pause: 20
+bridge_to_xterio:
+  # amount of BNB to bridge
+  AMOUNT: [0.0015, 0.0025]
 
-# BRIDGE
-BRIDGE: "false"
-AMOUNT: [0.0015, 0.0025]
+  # RPCs, change if you want
+  BNB_RPC: "https://binance.llamarpc.com"
+  XTERIO_RPC: "https://xterio.alt.technology"
+
+
+binance:
+  # if balance is less than this amount, bot will withdraw tokens
+  min_bnb_balance: 0.003
+  # amount of tokens to withdraw
+  withdraw_amount: [0.001, 0.0012]
+
+  # binance api key and secret
+  BINANCE_API_KEY: ""
+  BINANCE_API_SECRET: ""
+
+
+
 

@@ -15,6 +15,7 @@ from extra.client import create_client
 from extra.converter import mnemonic_to_private_key
 from model import constants
 from data import chat_messages
+from model.binance import withdraw
 from model.captcha_solver import CaptchaSolver
 
 
@@ -25,6 +26,7 @@ class Xterio:
         self.config = config
 
         self.eth_w3: Web3 | None = None
+        self.bsc_w3: Web3 | None = None
         self.address: ChecksumAddress | None = None
         self.client: requests.Session | None = None
 
@@ -50,9 +52,16 @@ class Xterio:
                     )
 
                 self.eth_w3 = Web3(
-                    Web3.HTTPProvider(self.config["XTERIO_RPC"], session=session)
+                    Web3.HTTPProvider(self.config["bridge_to_xterio"]["XTERIO_RPC"], session=session)
                 )
                 self.eth_w3.middleware_onion.inject(
+                    ExtraDataToPOAMiddleware, name="extradata_to_poa", layer=0
+                )
+
+                self.bsc_w3 = Web3(
+                    Web3.HTTPProvider(self.config["bridge_to_xterio"]["BNB_RPC"], session=session)
+                )
+                self.bsc_w3.middleware_onion.inject(
                     ExtraDataToPOAMiddleware, name="extradata_to_poa", layer=0
                 )
 
@@ -73,7 +82,9 @@ class Xterio:
         for task in tasks["list"]:
             if task["ID"] == 16:
                 if not task["user_task"]:
-                    ref_code = random.choice(self.config["invite_codes"])
+                    ref_code = random.choice(
+                        self.config["invite"]["invite_codes"]
+                    )
                     if ref_code:
                         self.apply_invite_code(ref_code)
 
@@ -133,8 +144,8 @@ class Xterio:
 
             time.sleep(
                 random.randint(
-                    self.config["pause_between_tasks"][0],
-                    self.config["pause_between_tasks"][1],
+                    self.config["settings"]["pause_between_tasks"][0],
+                    self.config["settings"]["pause_between_tasks"][1],
                 )
             )
 
@@ -154,8 +165,8 @@ class Xterio:
 
                 time.sleep(
                     random.randint(
-                        self.config["pause_between_tasks"][0],
-                        self.config["pause_between_tasks"][1],
+                        self.config["settings"]["pause_between_tasks"][0],
+                        self.config["settings"]["pause_between_tasks"][1],
                     )
                 )
 
@@ -398,11 +409,11 @@ class Xterio:
                     logger.info(f"{self.address} | Solving captcha for chat messages")
 
                     solver = CaptchaSolver(
-                        proxy=self.config["captcha_proxy"],
-                        api_key=self.config["captcha_api_key"],
+                        proxy=self.config["captcha"]["captcha_proxy"],
+                        api_key=self.config["captcha"]["captcha_api_key"],
                     )
 
-                    for _ in range(self.config["solve_captcha_attempts"]):
+                    for _ in range(self.config["captcha"]["solve_captcha_attempts"]):
                         result = solver.solve_hcaptcha(sitekey, pageurl)
                         if result:
                             logger.success(f"{self.address} | Captcha solved for chat")
@@ -446,10 +457,54 @@ class Xterio:
                 code = response.json()["data"]["code"]
                 logger.success(f"{self.address} | Collected invite code: {code}")
                 return code
-            
+
         except Exception as err:
             logger.error(f"{self.address} | Failed to collect invite code: {err}")
             return ""
+
+    def withdraw_from_binance(self):
+        try:
+            bnb_balance = self._check_bnb_balance()
+            if not bnb_balance:
+                raise Exception("Unable to check the BNB balance")
+
+            amount_to_withdraw = random.uniform(
+                self.config["binance"]["withdraw_amount"][0], self.config["binance"]["withdraw_amount"][1]
+            )
+
+            if bnb_balance < self.config["binance"]["min_bnb_balance"]:
+                result = withdraw(
+                    self.config["binance"]["BINANCE_API_KEY"],
+                    self.config["binance"]["BINANCE_API_SECRET"],
+                    "BNB",
+                    amount_to_withdraw,
+                    self.address,
+                    "BSC",
+                )
+                if not result:
+                    raise Exception("Failed to withdraw from Binance")
+                else:
+                    logger.success(
+                        f"{self.address} | Withdrew {amount_to_withdraw} BNB from Binance"
+                    )
+                    return True
+            else:
+                logger.info(f"{self.address} | BNB balance is enough")
+                return True
+            
+        except Exception as err:
+            logger.error(f"{self.address} | Failed to withdraw from Binance: {err}")
+            return False
+
+    def _check_bnb_balance(self):
+        for _ in range(5):
+            try:
+                balance_wei = self.bsc_w3.eth.get_balance(self.address)
+                return float(Web3.from_wei(balance_wei, "ether"))
+            except Exception as err:
+                logger.error(f"{self.address} | Failed to get BNB balance: {err}")
+
+        raise Exception("Failed to get BNB balance")
 
     def _get_tasks(self):
         try:
@@ -529,34 +584,43 @@ class Xterio:
     def bridge_eth(self):
         try:
             # Get random amount between config values with random decimal places (8-18)
-            amount = round(random.uniform(self.config["AMOUNT"][0], self.config["AMOUNT"][1]), random.randint(8, 18))
-            amount_wei = Web3.to_wei(amount, 'ether')
-            bnb_w3 = Web3(Web3.HTTPProvider(self.config["BNB_RPC"]))
-            
+            amount = round(
+                random.uniform(self.config["bridge_to_xterio"]["AMOUNT"][0], self.config["bridge_to_xterio"]["AMOUNT"][1]),
+                random.randint(8, 18),
+            )
+            amount_wei = Web3.to_wei(amount, "ether")
+            bnb_w3 = Web3(Web3.HTTPProvider(self.config["bridge_to_xterio"]["BNB_RPC"]))
+
             contract_address = Web3.to_checksum_address(constants.CONTRACT_ADDRESS)
-            contract = bnb_w3.eth.contract(address=contract_address, abi=constants.CONTRACT_ABI)
-            
+            contract = bnb_w3.eth.contract(
+                address=contract_address, abi=constants.CONTRACT_ABI
+            )
+
             # Get current nonce including pending transactions
             nonce = bnb_w3.eth.get_transaction_count(self.address, "latest")
             # Build transaction using contract function
             transaction = contract.functions.bridgeETHTo(
                 self.address,
                 200000,  # _minGasLimit
-                bytes.fromhex("7375706572627269646765")  # _extraData
-            ).build_transaction({
-                "from": self.address,
-                "value": amount_wei,
-                "nonce": nonce,
-                "gasPrice": bnb_w3.to_wei(1, 'gwei'),
-            })
+                bytes.fromhex("7375706572627269646765"),  # _extraData
+            ).build_transaction(
+                {
+                    "from": self.address,
+                    "value": amount_wei,
+                    "nonce": nonce,
+                    "gasPrice": bnb_w3.to_wei(1, "gwei"),
+                }
+            )
             # Estimate gas
             gas_estimate = bnb_w3.eth.estimate_gas(transaction)
-            transaction['gas'] = int(gas_estimate * 1.15)  # Add 15% buffer
-            
+            transaction["gas"] = int(gas_estimate * 1.15)  # Add 15% buffer
+
             signed_transaction = bnb_w3.eth.account.sign_transaction(
                 transaction, private_key=self.private_key
             )
-            tx_hash = bnb_w3.eth.send_raw_transaction(signed_transaction.raw_transaction)
+            tx_hash = bnb_w3.eth.send_raw_transaction(
+                signed_transaction.raw_transaction
+            )
             receipt = bnb_w3.eth.wait_for_transaction_receipt(tx_hash)
 
             if receipt.status == 1:

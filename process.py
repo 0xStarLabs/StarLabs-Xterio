@@ -15,16 +15,23 @@ def start():
     extra.show_logo()
     extra.show_dev_info()
 
+    task = int(
+        input(
+            "Choose what to do: \n\n"
+            "[1] Xterio tasks\n"
+            "[2] Withdraw from Binance\n"
+            "[3] Bridge to Xterio from BNB\n"
+            "[4] Collect invite codes\n\n>> "
+        ).strip()
+    )
+
     def launch_wrapper(index, proxy, private_key):
         if index <= threads:
             delay = random.uniform(1, threads)
             logger.info(f"Thread {index} starting with delay {delay:.1f}s")
             time.sleep(delay)
-        
-        if config["BRIDGE"].lower() == "true":
-            bridge_flow(lock, index, proxy, private_key, config)
-        else:
-            account_flow(lock, index, proxy, private_key, config)
+
+        account_flow(lock, index, proxy, private_key, config, task)
 
     threads = int(input("\nHow many threads do you want: ").strip())
 
@@ -34,9 +41,8 @@ def start():
     proxies = extra.read_txt_file("proxies", "data/proxies.txt")
     private_keys = extra.read_txt_file("private keys", "data/private_keys.txt")
     indexes = [i + 1 for i in range(len(private_keys))]
-    mobile_proxy_queue = queue.Queue()
 
-    if config["shuffle_accounts"]:
+    if config["settings"]["shuffle_accounts"]:
         combined = list(zip(indexes, proxies, private_keys))
         random.shuffle(combined)
         indexes, proxies, private_keys = zip(*combined)
@@ -62,59 +68,43 @@ def start():
     logger.success("Saved accounts and private keys to a file.")
 
 
-def bridge_flow(
-    lock: threading.Lock, account_index: int, proxy: str, private_key: str, config: dict
-):
-    try:
-        xterio_instance = model.xterio.Xterio(private_key, proxy, config)
-
-        ok = wrapper(xterio_instance.init_instance, 1)
-        if not ok:
-            raise Exception("unable to init xterio instance")
-
-        ok = wrapper(xterio_instance.bridge_eth, 1)
-        if not ok:
-            raise Exception("unable to complete bridge")
-        logger.success(f"{account_index} | Successfully completed bridge")
-
-        with lock:
-            with open("data/bridge_success.txt", "a") as f:
-                f.write(f"{private_key}:{proxy}\n")
-
-        time.sleep(
-            random.randint(
-                config["pause_between_accounts"][0], config["pause_between_accounts"][1]
-            )
-        )
-        logger.success(f"{account_index} | Bridge flow completed successfully")
-
-    except Exception as err:
-        logger.error(f"{account_index} | Bridge flow failed: {err}")
-        with lock:
-            report_failed_key(private_key, proxy)
-
-
 def account_flow(
-    lock: threading.Lock, account_index: int, proxy: str, private_key: str, config: dict
+    lock: threading.Lock,
+    account_index: int,
+    proxy: str,
+    private_key: str,
+    config: dict,
+    task: int,
 ):
     try:
         xterio_instance = model.xterio.Xterio(private_key, proxy, config)
 
         ok = wrapper(xterio_instance.init_instance, 1)
+
         if not ok:
             raise Exception("unable to init xterio instance")
 
-        if config["collect_invite_codes"]:
+        if task == 1:
+            ok = wrapper(xterio_instance.complete_all_tasks, 1)
+            if not ok:
+                raise Exception("unable to complete all tasks")
+
+        elif task == 2:
+            ok = wrapper(xterio_instance.withdraw_from_binance, 1)
+            if not ok:
+                raise Exception("unable to withdraw from binance")
+
+        elif task == 3:
+            ok = wrapper(xterio_instance.bridge_eth, 1)
+            if not ok:
+                raise Exception("unable to bridge to xterio")
+
+        elif task == 4:
             invite_code = xterio_instance.collect_invite_code()
             if invite_code:
                 with lock:
                     with open("data/invite_codes.txt", "a") as f:
-                        f.write(f"{private_key}|{invite_code}\n") 
-            return
-        
-        ok = wrapper(xterio_instance.complete_all_tasks, 1)
-        if not ok:
-            raise Exception("unable to complete all tasks")
+                        f.write(f"{private_key}|{invite_code}\n")
 
         with lock:
             with open("data/success_data.txt", "a") as f:
@@ -122,7 +112,8 @@ def account_flow(
 
         time.sleep(
             random.randint(
-                config["pause_between_accounts"][0], config["pause_between_accounts"][1]
+                config["settings"]["pause_between_accounts"][0],
+                config["settings"]["pause_between_accounts"][1],
             )
         )
         logger.success(f"{account_index} | Account flow completed successfully")
@@ -153,36 +144,3 @@ def report_failed_key(private_key: str, proxy: str):
 
     except Exception as err:
         logger.error(f"Error while reporting failed account: {err}")
-
-
-def mobile_proxy_wrapper(data):
-    proxy, ip_change_link, mobile_proxy_queue, config, lock, private_keys = data[:7]
-
-    while not mobile_proxy_queue.empty():
-        i = mobile_proxy_queue.get()
-
-        try:
-            for _ in range(3):
-                try:
-                    requests.get(
-                        f"{ip_change_link}",
-                        headers={
-                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                        },
-                        timeout=60,
-                    )
-
-                    time.sleep(config["change_ip_pause"])
-                    logger.success(f"{i + 1} | Successfully changed IP")
-                    break
-
-                except Exception as err:
-                    logger.error(
-                        f"{i + 1} | Mobile proxy error! Check your ip change link: {err}"
-                    )
-                    time.sleep(2)
-
-            account_flow(lock, i + 1, proxy, private_keys[i], config)
-
-        except Exception as err:
-            logger.error(f"{i + 1} | Mobile proxy flow error: {err}")
