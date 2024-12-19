@@ -17,6 +17,7 @@ from model import constants
 from data import chat_messages
 from model.binance import withdraw
 from model.captcha_solver import CaptchaSolver
+from model.gpt import ask_chatgpt
 
 
 class Xterio:
@@ -52,14 +53,18 @@ class Xterio:
                     )
 
                 self.eth_w3 = Web3(
-                    Web3.HTTPProvider(self.config["bridge_to_xterio"]["XTERIO_RPC"], session=session)
+                    Web3.HTTPProvider(
+                        self.config["bridge_to_xterio"]["XTERIO_RPC"], session=session
+                    )
                 )
                 self.eth_w3.middleware_onion.inject(
                     ExtraDataToPOAMiddleware, name="extradata_to_poa", layer=0
                 )
 
                 self.bsc_w3 = Web3(
-                    Web3.HTTPProvider(self.config["bridge_to_xterio"]["BNB_RPC"], session=session)
+                    Web3.HTTPProvider(
+                        self.config["bridge_to_xterio"]["BNB_RPC"], session=session
+                    )
                 )
                 self.bsc_w3.middleware_onion.inject(
                     ExtraDataToPOAMiddleware, name="extradata_to_poa", layer=0
@@ -82,9 +87,7 @@ class Xterio:
         for task in tasks["list"]:
             if task["ID"] == 16:
                 if not task["user_task"]:
-                    ref_code = random.choice(
-                        self.config["invite"]["invite_codes"]
-                    )
+                    ref_code = random.choice(self.config["invite"]["invite_codes"])
                     if ref_code:
                         self.apply_invite_code(ref_code)
 
@@ -105,7 +108,7 @@ class Xterio:
                         hour=0, minute=0, second=0, microsecond=0
                     )
 
-                    # Если date_obj меньше начала текущего дня, значит обновление было не сегодня
+                    # Если date_obj меньше ачала текущего дня, значит обновление было не сегодня
                     is_yesterday = date_obj < today_start
 
                     if is_yesterday:
@@ -395,7 +398,55 @@ class Xterio:
     def send_chat_messages(self):
         try:
             for _ in range(3):
-                message = random.choice(chat_messages.CHAT_MESSAGES)
+                if self.config["settings"]["use_chatgpt"]:
+                    response = self.client.get("https://api.xter.io/ai/v1/scene?lang=")
+                    if response.json()["err_code"] != 0:
+                        raise Exception(response.text)
+
+                    scene_list = response.json()["data"]["list"]
+                    if not scene_list:
+                        raise Exception("Scene list is empty")
+                    scene = (
+                        scene_list[0]["describe"]
+                        if len(scene_list) == 1
+                        else scene_list[-1]["describe"]
+                    )
+                    if len(scene_list[0]) == 1:
+                        chat_item = scene_list[0]
+                    else:
+                        chat_item = scene_list[-1]
+
+                    scene = chat_item["describe"]
+
+                    response = self.client.get("https://api.xter.io/ai/v1/user/chat")
+                    if response.json()["err_code"] != 0:
+                        raise Exception(response.text)
+
+                    message_list = response.json()["data"]["list"]
+                    if not message_list:
+                        prologue = chat_item["prologue"]
+                        placeholder = chat_item["placeholder"]
+
+                        message = f"Prologue: {prologue}. Placeholder: {placeholder}"
+
+                    else:
+                        last_message = (
+                            message_list[0]
+                            if len(message_list) == 1
+                            else message_list[-1]
+                        )
+
+                        ai_answer_text = last_message["extract"]["words"]
+                        ai_answer_mood = last_message["extract"]["mood"]
+
+                        message = f"Scene: {scene}. AI mood: {ai_answer_mood}. AI asks you: {ai_answer_text}"
+
+                    message = ask_chatgpt(
+                        self.config["settings"]["chat_gpt_api_key"], message
+                    )
+
+                else:
+                    message = random.choice(chat_messages.CHAT_MESSAGES)
 
                 json_data = {
                     "answer": message,
@@ -469,7 +520,8 @@ class Xterio:
                 raise Exception("Unable to check the BNB balance")
 
             amount_to_withdraw = random.uniform(
-                self.config["binance"]["withdraw_amount"][0], self.config["binance"]["withdraw_amount"][1]
+                self.config["binance"]["withdraw_amount"][0],
+                self.config["binance"]["withdraw_amount"][1],
             )
 
             if bnb_balance < self.config["binance"]["min_bnb_balance"]:
@@ -491,7 +543,7 @@ class Xterio:
             else:
                 logger.info(f"{self.address} | BNB balance is enough")
                 return True
-            
+
         except Exception as err:
             logger.error(f"{self.address} | Failed to withdraw from Binance: {err}")
             return False
@@ -585,7 +637,10 @@ class Xterio:
         try:
             # Get random amount between config values with random decimal places (8-18)
             amount = round(
-                random.uniform(self.config["bridge_to_xterio"]["AMOUNT"][0], self.config["bridge_to_xterio"]["AMOUNT"][1]),
+                random.uniform(
+                    self.config["bridge_to_xterio"]["AMOUNT"][0],
+                    self.config["bridge_to_xterio"]["AMOUNT"][1],
+                ),
                 random.randint(8, 18),
             )
             amount_wei = Web3.to_wei(amount, "ether")

@@ -11,6 +11,12 @@ captcha:
 
 
 settings:
+  # Use ChatGPT for generating chat messages answers
+  use_chatgpt: false
+
+  # ChatGPT API key
+  chat_gpt_api_key: "sk-xxx"
+
   # use accounts in random order - true / false
   shuffle_accounts: false
 
