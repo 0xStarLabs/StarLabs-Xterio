@@ -124,9 +124,14 @@ def account_flow(
             if not ok:
                 raise Exception("unable to check account score")
 
-        with lock:
-            with open("data/success_data.txt", "a") as f:
-                f.write(f"{private_key}:{proxy}\n")
+        if task == 5:
+            with lock:
+                with open("data/success_data.txt", "a") as f:
+                    f.write(f"{private_key}:{proxy}:{email}\n")
+        else:
+            with lock:
+                with open("data/success_data.txt", "a") as f:
+                    f.write(f"{private_key}:{proxy}\n")
 
         time.sleep(
             random.randint(
