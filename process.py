@@ -21,17 +21,19 @@ def start():
             "[1] Xterio tasks\n"
             "[2] Withdraw from Binance\n"
             "[3] Bridge to Xterio from BNB\n"
-            "[4] Collect invite codes\n\n>> "
+            "[4] Collect invite codes\n"
+            "[5] Connect email\n"
+            "[6] Check account score\n\n>> "
         ).strip()
     )
 
-    def launch_wrapper(index, proxy, private_key):
+    def launch_wrapper(index, proxy, private_key, email):
         if index <= threads:
             delay = random.uniform(1, threads)
             logger.info(f"Thread {index} starting with delay {delay:.1f}s")
             time.sleep(delay)
 
-        account_flow(lock, index, proxy, private_key, config, task)
+        account_flow(lock, index, proxy, private_key, config, task, email)
 
     threads = int(input("\nHow many threads do you want: ").strip())
 
@@ -41,6 +43,11 @@ def start():
     proxies = extra.read_txt_file("proxies", "data/proxies.txt")
     private_keys = extra.read_txt_file("private keys", "data/private_keys.txt")
     indexes = [i + 1 for i in range(len(private_keys))]
+
+    if task == 5:
+        emails = extra.read_txt_file("emails", "data/emails.txt")
+    else:
+        emails = [":" for _ in range(len(private_keys))]
 
     if config["settings"]["shuffle_accounts"]:
         combined = list(zip(indexes, proxies, private_keys))
@@ -63,7 +70,7 @@ def start():
 
     logger.info("Starting...")
     with ThreadPoolExecutor(max_workers=threads) as executor:
-        executor.map(launch_wrapper, indexes, proxies, private_keys)
+        executor.map(launch_wrapper, indexes, proxies, private_keys, emails)
 
     logger.success("Saved accounts and private keys to a file.")
 
@@ -75,9 +82,10 @@ def account_flow(
     private_key: str,
     config: dict,
     task: int,
+    email: str,
 ):
     try:
-        xterio_instance = model.xterio.Xterio(private_key, proxy, config)
+        xterio_instance = model.xterio.Xterio(private_key, proxy, config, email)
 
         ok = wrapper(xterio_instance.init_instance, 1)
 
@@ -105,6 +113,16 @@ def account_flow(
                 with lock:
                     with open("data/invite_codes.txt", "a") as f:
                         f.write(f"{private_key}|{invite_code}\n")
+
+        elif task == 5:
+            ok = wrapper(xterio_instance.connect_email, 1)
+            if not ok:
+                raise Exception("unable to connect email")
+
+        elif task == 6:
+            ok = wrapper(xterio_instance.check_account_score, 1)
+            if not ok:
+                raise Exception("unable to check account score")
 
         with lock:
             with open("data/success_data.txt", "a") as f:

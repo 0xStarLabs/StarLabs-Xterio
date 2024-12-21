@@ -13,7 +13,7 @@ from curl_cffi import requests
 
 from extra.client import create_client
 from extra.converter import mnemonic_to_private_key
-from model import constants
+from model import constants, email_parser
 from data import chat_messages
 from model.binance import withdraw
 from model.captcha_solver import CaptchaSolver
@@ -21,10 +21,12 @@ from model.gpt import ask_chatgpt
 
 
 class Xterio:
-    def __init__(self, private_key, proxy, config):
+    def __init__(self, private_key, proxy, config, email):
         self.private_key = private_key
         self.proxy = proxy
         self.config = config
+        self.email_login = email.split(":")[0]
+        self.email_password = email.split(":")[1]
 
         self.eth_w3: Web3 | None = None
         self.bsc_w3: Web3 | None = None
@@ -81,7 +83,6 @@ class Xterio:
         return False
 
     def complete_all_tasks(self):
-
         tasks = self._get_tasks()
 
         for task in tasks["list"]:
@@ -135,7 +136,7 @@ class Xterio:
                         hour=0, minute=0, second=0, microsecond=0
                     )
 
-                    # Если date_obj меньше начала текущего дня, значит обновление было не сегодня
+                    # Если date_obj меньше нач��ла текущего дня, значит обновление было не сегодня
                     is_yesterday = date_obj < today_start
 
                     if is_yesterday:
@@ -442,12 +443,14 @@ class Xterio:
                         message = f"Scene: {scene}. AI mood: {ai_answer_mood}. AI asks you: {ai_answer_text}"
 
                     message = ask_chatgpt(
-                        self.config["settings"]["chat_gpt_api_key"], message, self.config["settings"]["proxy_for_chat_gpt"]
+                        self.config["settings"]["chat_gpt_api_key"],
+                        message,
+                        self.config["settings"]["proxy_for_chat_gpt"],
                     )
 
                     if "Error occurred:" in message:
                         raise Exception(message)
-                    
+
                     if attempt == 0:
                         message = "You all right. " + message
 
@@ -501,7 +504,6 @@ class Xterio:
                 time.sleep(random.randint(3, 6))
 
         except Exception as err:
-            traceback.print_exc()
             logger.error(f"{self.address} | Failed to send chat message: {err}")
             return False
 
@@ -552,6 +554,111 @@ class Xterio:
 
         except Exception as err:
             logger.error(f"{self.address} | Failed to withdraw from Binance: {err}")
+            return False
+
+    def connect_email(self):
+        try:
+            response = self.client.get("https://api.xter.io/account/v1/user/2fa?")
+            try:
+                response_data = response.json()
+                if response_data.get("err_code") != 0:
+                    raise Exception(response.text)
+
+                data = response_data.get("data", {})
+                if not isinstance(data, dict):
+                    logger.info(f"{self.address} | No email connected yet")
+                else:
+                    email = data.get("email")
+                    if email is not None and email.strip():
+                        logger.info(
+                            f"{self.address} | Email already connected: {email}"
+                        )
+                        return True
+
+                    logger.info(f"{self.address} | No email connected yet")
+
+            except ValueError as e:
+                logger.error(f"{self.address} | Invalid 2FA check response: {e}")
+                return False
+
+            except Exception as e:
+                if "2fa configuration error" in str(e):
+                    pass
+                else:
+                    logger.error(f"{self.address} | Error checking 2FA status: {e}")
+                    return False
+
+            logger.info(f"{self.address} | Trying to connect email...")
+
+            response = self.client.post(
+                "https://api.xter.io/account/v1/user/2fa/email",
+                json={"email": self.email_login},
+            )
+
+            if response.json()["err_code"] != 0:
+                raise Exception(response.text)
+            else:
+                logger.success(f"{self.address} | Email code sent!")
+
+            email_checker = email_parser.SyncEmailChecker(
+                email=self.email_login, password=self.email_password
+            )
+
+            if email_checker.check_if_email_valid():
+                # Search for verification code
+                logger.info(f"{self.address} | Searching for email code...")
+                code = email_checker.check_email_for_code()
+                if code:
+                    logger.success(f"{self.address} | Email code: {code}")
+                else:
+                    raise Exception("Failed to get email code")
+            else:
+                logger.error(f"{self.address} | Invalid email credentials")
+                return False
+
+            response = self.client.post(
+                "https://api.xter.io/account/v1/user/2fa/email/set", json={"code": code}
+            )
+
+            if response.json()["err_code"] != 0:
+                raise Exception(response.text)
+            else:
+                logger.success(f"{self.address} | Email code set!")
+
+            response = self.client.get("https://api.xter.io/account/v1/user/2fa?")
+            if response.json()["err_code"] != 0:
+                raise Exception(response.text)
+
+            data = response.json()["data"]
+            if data["email"] != "":
+                logger.success(f"{self.address} | Email {data['email']} connected!")
+                return True
+            else:
+                raise Exception("Failed to connect email")
+
+        except Exception as err:
+            logger.error(f"{self.address} | Failed to connect email: {err}")
+            return False
+
+    def check_account_score(self):
+        try:
+            response = self.client.get("https://api.xter.io/ai/v1/user/score")
+            if response.json()["err_code"] != 0:
+                raise Exception(response.text)
+
+            data = response.json()["data"]
+            multiply = data.get("multiply", "?")
+            task = data.get("task", "?")
+            base = data.get("base", "?")
+
+            logger.success(
+                f"{self.address} | Account score: Task: {task} | Multiply: {multiply} | Base: {base}"
+            )
+
+            return True
+        
+        except Exception as err:
+            logger.error(f"{self.address} | Failed to check account score: {err}")
             return False
 
     def _check_bnb_balance(self):

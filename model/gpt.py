@@ -21,10 +21,10 @@ def ask_chatgpt(
 
     if proxy:
         proxies = {
-            "http": f"http://{proxy}",
-            "https": f"http://{proxy}",
+            "http://": httpx.HTTPTransport(proxy=proxy),
+            "https://": httpx.HTTPTransport(proxy=proxy)
         }
-        http_client = httpx.Client(proxies=proxies)
+        http_client = httpx.Client(mounts=proxies)
         client = OpenAI(api_key=api_key, http_client=http_client)
         
     else:
