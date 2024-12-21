@@ -42,7 +42,18 @@ bridge_to_xterio:
   AMOUNT: [0.0015, 0.0025]
 
   # RPCs, change if you want
-  BNB_RPC: "https://binance.llamarpc.com"
+  BNB_RPCS: [
+    https://rpc.ankr.com/bsc,
+    https://1rpc.io/bnb,
+    https://bsc.drpc.org,
+    https://binance.llamarpc.com,
+    https://bsc.meowrpc.com,
+    https://bsc-mainnet.public.blastapi.io,
+    https://bsc-pokt.nodies.app,
+    https://bsc-dataseed1.defibit.io,
+    https://bscrpc.com,
+            ]
+
   XTERIO_RPC: "https://xterio.alt.technology"
 
 
