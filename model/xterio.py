@@ -397,7 +397,7 @@ class Xterio:
 
     def send_chat_messages(self):
         try:
-            for _ in range(3):
+            for attempt in range(3):
                 if self.config["settings"]["use_chatgpt"]:
                     response = self.client.get("https://api.xter.io/ai/v1/scene?lang=")
                     if response.json()["err_code"] != 0:
@@ -444,6 +444,12 @@ class Xterio:
                     message = ask_chatgpt(
                         self.config["settings"]["chat_gpt_api_key"], message, self.config["settings"]["proxy_for_chat_gpt"]
                     )
+
+                    if "Error occurred:" in message:
+                        raise Exception(message)
+                    
+                    if attempt == 0:
+                        message = "You all right. " + message
 
                 else:
                     message = random.choice(chat_messages.CHAT_MESSAGES)
