@@ -11,3 +11,4 @@ Requests==2.32.3
 termcolor==2.5.0
 urllib3==2.2.3
 web3==7.6.0
+python-binance==1.0.25
