@@ -442,7 +442,7 @@ class Xterio:
                         message = f"Scene: {scene}. AI mood: {ai_answer_mood}. AI asks you: {ai_answer_text}"
 
                     message = ask_chatgpt(
-                        self.config["settings"]["chat_gpt_api_key"], message
+                        self.config["settings"]["chat_gpt_api_key"], message, self.config["settings"]["proxy_for_chat_gpt"]
                     )
 
                 else:

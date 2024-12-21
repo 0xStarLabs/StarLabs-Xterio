@@ -1,11 +1,11 @@
 from openai import OpenAI
 from typing import Optional
-
+import httpx
 
 system_prompt = "Your answer should be no longer than 230 characters. You need to enter the role of the scenario and answer according to the given prompt."
 
 def ask_chatgpt(
-    api_key: str, user_message: str
+    api_key: str, user_message: str, proxy: str = ""
 ) -> str:
     """
     Send a message to ChatGPT and get a response.
@@ -18,7 +18,17 @@ def ask_chatgpt(
     Returns:
         str: ChatGPT's response
     """
-    client = OpenAI(api_key=api_key)
+
+    if proxy:
+        proxies = {
+            "http": f"http://{proxy}",
+            "https": f"http://{proxy}",
+        }
+        http_client = httpx.Client(proxies=proxies)
+        client = OpenAI(api_key=api_key, http_client=http_client)
+        
+    else:
+        client = OpenAI(api_key=api_key)
 
     # Prepare the messages
     messages = []

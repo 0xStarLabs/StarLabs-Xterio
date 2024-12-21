@@ -17,6 +17,9 @@ settings:
   # ChatGPT API key
   chat_gpt_api_key: "sk-xxx"
 
+  # proxy for chat gpt. format user:pass@ip:port. by default it's ""
+  proxy_for_chat_gpt: ""
+
   # use accounts in random order - true / false
   shuffle_accounts: false
 
