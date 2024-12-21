@@ -3,12 +3,14 @@ colorama==0.4.6
 curl_cffi==0.7.4
 eth_account==0.13.4
 eth_typing==5.0.1
+httpx==0.28.1
+imap_tools==1.8.0
 loguru==0.7.2
 openai==1.58.1
 pyfiglet==1.0.2
+pytz==2024.2
 PyYAML==6.0.2
 Requests==2.32.3
 termcolor==2.5.0
 urllib3==2.2.3
 web3==7.6.0
-python-binance==1.0.25
