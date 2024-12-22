@@ -29,6 +29,12 @@ settings:
   # pause between accounts in seconds
   pause_between_accounts: [10, 20]
 
+  # retry attempts
+  claim_retry_attempts: 5
+
+  # pause between retries in seconds
+  pause_between_claim_retries: [10, 15]
+
 
 invite:
   # invite codes. bot takes it random from this list

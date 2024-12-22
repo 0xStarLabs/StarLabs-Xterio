@@ -179,181 +179,217 @@ class Xterio:
         return True
 
     def claim_mission(self, task_id):
-        try:
-            contract_address = Web3.to_checksum_address(
-                "0x7bb85350e3a883A1708648AB7e37cEf4651cFd48"
-            )
-
-            # Generate function call data with task_id
-            function_selector = "0xdc7d41f6"
-            # Pad task_id to 32 bytes
-            padded_task_id = hex(task_id)[2:].zfill(64)
-            # Pad walletType (1) to 32 bytes
-            wallet_type = hex(1)[2:].zfill(64)
-            # Combine function selector and parameters
-            data = function_selector + padded_task_id + wallet_type
-
-            # Get current nonce including pending transactions
-            pending_nonce = self.eth_w3.eth.get_transaction_count(
-                self.address, "pending"
-            )
-            latest_nonce = self.eth_w3.eth.get_transaction_count(self.address, "latest")
-            nonce = max(pending_nonce, latest_nonce)
-
-            # Get gas estimate
-            gas_estimate = self.eth_w3.eth.estimate_gas(
-                {"from": self.address, "to": contract_address, "data": data, "value": 0}
-            )
-
-            # Calculate gas parameters
-            recommended_base_fee = self.eth_w3.eth.fee_history(
-                block_count=1, newest_block="latest"
-            )["baseFeePerGas"][0]
-            max_priority_fee_per_gas = self.eth_w3.to_wei(0.002, "gwei")
-            max_fee_per_gas = recommended_base_fee + max_priority_fee_per_gas
-
-            transaction = {
-                "chainId": 112358,
-                "from": self.address,
-                "to": contract_address,
-                "value": 0,
-                "data": data,
-                "nonce": nonce,
-                "type": "0x2",
-                "maxFeePerGas": max_fee_per_gas,
-                "maxPriorityFeePerGas": max_priority_fee_per_gas,
-                "gas": int(gas_estimate * 1.15),
-            }
-
-            signed_transaction = self.eth_w3.eth.account.sign_transaction(
-                transaction, private_key=self.private_key
-            )
-
-            tx_hash = self.eth_w3.eth.send_raw_transaction(
-                signed_transaction.raw_transaction
-            )
-            receipt = self.eth_w3.eth.wait_for_transaction_receipt(tx_hash)
-
-            if receipt.status == 1:
-                logger.success(
-                    f"{self.address} | Successfully claimed AI mission: {task_id}"
+        for retry in range(self.config["settings"]["claim_retry_attempts"]):
+            try:
+                contract_address = Web3.to_checksum_address(
+                    "0x7bb85350e3a883A1708648AB7e37cEf4651cFd48"
                 )
-            else:
-                raise Exception(f"Transaction failed: {tx_hash.hex()}")
 
-            tx = "0x" + tx_hash.hex()
+                # Generate function call data with task_id
+                function_selector = "0xdc7d41f6"
+                # Pad task_id to 32 bytes
+                padded_task_id = hex(task_id)[2:].zfill(64)
+                # Pad walletType (1) to 32 bytes
+                wallet_type = hex(1)[2:].zfill(64)
+                # Combine function selector and parameters
+                data = function_selector + padded_task_id + wallet_type
 
-            json_data = {
-                "task_id": task_id,
-                "tx_hash": tx,
-                "is_by_bit": 1,
-            }
+                # Get current nonce including pending transactions
+                pending_nonce = self.eth_w3.eth.get_transaction_count(
+                    self.address, "pending"
+                )
+                latest_nonce = self.eth_w3.eth.get_transaction_count(
+                    self.address, "latest"
+                )
+                nonce = max(pending_nonce, latest_nonce)
 
-            response = self.client.post(
-                "https://api.xter.io/ai/v1/user/task", json=json_data
-            )
+                # Get gas estimate
+                gas_estimate = self.eth_w3.eth.estimate_gas(
+                    {
+                        "from": self.address,
+                        "to": contract_address,
+                        "data": data,
+                        "value": 0,
+                    }
+                )
 
-            if response.json()["err_code"] != 0:
-                raise Exception(response.text)
-            else:
-                logger.success(f"{self.address} | Complete claim {task_id} mission.")
-                return True
+                # Calculate gas parameters
+                recommended_base_fee = self.eth_w3.eth.fee_history(
+                    block_count=1, newest_block="latest"
+                )["baseFeePerGas"][0]
+                max_priority_fee_per_gas = self.eth_w3.to_wei(0.002, "gwei")
+                max_fee_per_gas = recommended_base_fee + max_priority_fee_per_gas
 
-        except Exception as err:
-            logger.error(f"{self.address} | Failed to claim mission: {err}")
-            return False
+                transaction = {
+                    "chainId": 112358,
+                    "from": self.address,
+                    "to": contract_address,
+                    "value": 0,
+                    "data": data,
+                    "nonce": nonce,
+                    "type": "0x2",
+                    "maxFeePerGas": max_fee_per_gas,
+                    "maxPriorityFeePerGas": max_priority_fee_per_gas,
+                    "gas": int(gas_estimate * 1.15),
+                }
 
-    def claim_chat_score(self):
-        try:
-            response = self.client.get("https://api.xter.io/ai/v1/user/chat")
+                signed_transaction = self.eth_w3.eth.account.sign_transaction(
+                    transaction, private_key=self.private_key
+                )
 
-            if response.json()["err_code"] != 0:
-                raise Exception(response.text)
-            else:
-                claim_status = response.json()["data"]["claim_status"]
-                if claim_status == 2:
-                    logger.info(f"{self.address} | Already claimed chat score")
+                tx_hash = self.eth_w3.eth.send_raw_transaction(
+                    signed_transaction.raw_transaction
+                )
+                receipt = self.eth_w3.eth.wait_for_transaction_receipt(tx_hash)
+
+                if receipt.status == 1:
+                    logger.success(
+                        f"{self.address} | Successfully claimed AI mission: {task_id}"
+                    )
+                else:
+                    raise Exception(f"Transaction failed: {tx_hash.hex()}")
+
+                tx = "0x" + tx_hash.hex()
+
+                json_data = {
+                    "task_id": task_id,
+                    "tx_hash": tx,
+                    "is_by_bit": 1,
+                }
+
+                response = self.client.post(
+                    "https://api.xter.io/ai/v1/user/task", json=json_data
+                )
+
+                if response.json()["err_code"] != 0:
+                    raise Exception(response.text)
+                else:
+                    logger.success(
+                        f"{self.address} | Complete claim {task_id} mission."
+                    )
                     return True
 
-            contract_address = Web3.to_checksum_address(
-                "0x7bb85350e3a883A1708648AB7e37cEf4651cFd48"
-            )
+            except Exception as err:
+                logger.error(
+                    f"{self.address} | Failed to claim mission {retry + 1}/{self.config['settings']['claim_retry_attempts']}: {err}"
+                )
+                time.sleep(
+                    random.randint(
+                        self.config["settings"]["pause_between_claim_retries"][0],
+                        self.config["settings"]["pause_between_claim_retries"][1],
+                    )
+                )
 
-            # Generate function call data
-            function_selector = "0x31bf7fe8"
-            # Pad walletType (1) to 32 bytes
-            wallet_type = hex(1)[2:].zfill(64)
-            # Combine function selector and parameter
-            data = function_selector + wallet_type
+        return False
 
-            # Get current nonce including pending transactions
-            pending_nonce = self.eth_w3.eth.get_transaction_count(
-                self.address, "pending"
-            )
-            latest_nonce = self.eth_w3.eth.get_transaction_count(self.address, "latest")
-            nonce = max(pending_nonce, latest_nonce)
+    def claim_chat_score(self):
+        for retry in range(self.config["settings"]["claim_retry_attempts"]):
+            try:
+                response = self.client.get("https://api.xter.io/ai/v1/user/chat")
 
-            # Get gas estimate
-            gas_estimate = self.eth_w3.eth.estimate_gas(
-                {"from": self.address, "to": contract_address, "data": data, "value": 0}
-            )
+                if response.json()["err_code"] != 0:
+                    raise Exception(response.text)
+                else:
+                    claim_status = response.json()["data"]["claim_status"]
+                    if claim_status == 2:
+                        logger.info(f"{self.address} | Already claimed chat score")
+                        return True
 
-            # Calculate gas parameters
-            recommended_base_fee = self.eth_w3.eth.fee_history(
-                block_count=1, newest_block="latest"
-            )["baseFeePerGas"][0]
-            max_priority_fee_per_gas = self.eth_w3.to_wei(0.002, "gwei")
-            max_fee_per_gas = recommended_base_fee + max_priority_fee_per_gas
+                contract_address = Web3.to_checksum_address(
+                    "0x7bb85350e3a883A1708648AB7e37cEf4651cFd48"
+                )
 
-            transaction = {
-                "chainId": 112358,
-                "from": self.address,
-                "to": contract_address,
-                "value": 0,
-                "data": data,
-                "nonce": nonce,
-                "type": "0x2",
-                "maxFeePerGas": max_fee_per_gas,
-                "maxPriorityFeePerGas": max_priority_fee_per_gas,
-                "gas": int(gas_estimate * 1.15),
-            }
+                # Generate function call data
+                function_selector = "0x31bf7fe8"
+                # Pad walletType (1) to 32 bytes
+                wallet_type = hex(1)[2:].zfill(64)
+                # Combine function selector and parameter
+                data = function_selector + wallet_type
 
-            signed_transaction = self.eth_w3.eth.account.sign_transaction(
-                transaction, private_key=self.private_key
-            )
+                # Get current nonce including pending transactions
+                pending_nonce = self.eth_w3.eth.get_transaction_count(
+                    self.address, "pending"
+                )
+                latest_nonce = self.eth_w3.eth.get_transaction_count(
+                    self.address, "latest"
+                )
+                nonce = max(pending_nonce, latest_nonce)
 
-            tx_hash = self.eth_w3.eth.send_raw_transaction(
-                signed_transaction.raw_transaction
-            )
-            receipt = self.eth_w3.eth.wait_for_transaction_receipt(tx_hash)
+                # Get gas estimate
+                gas_estimate = self.eth_w3.eth.estimate_gas(
+                    {
+                        "from": self.address,
+                        "to": contract_address,
+                        "data": data,
+                        "value": 0,
+                    }
+                )
 
-            if receipt.status != 1:
-                raise Exception(f"Transaction failed: {tx_hash.hex()}")
-            else:
-                logger.success(f"{self.address} | Successfully claimed chat score")
-                return True
+                # Calculate gas parameters
+                recommended_base_fee = self.eth_w3.eth.fee_history(
+                    block_count=1, newest_block="latest"
+                )["baseFeePerGas"][0]
+                max_priority_fee_per_gas = self.eth_w3.to_wei(0.002, "gwei")
+                max_fee_per_gas = recommended_base_fee + max_priority_fee_per_gas
 
-            # tx = "0x" + tx_hash.hex()
+                transaction = {
+                    "chainId": 112358,
+                    "from": self.address,
+                    "to": contract_address,
+                    "value": 0,
+                    "data": data,
+                    "nonce": nonce,
+                    "type": "0x2",
+                    "maxFeePerGas": max_fee_per_gas,
+                    "maxPriorityFeePerGas": max_priority_fee_per_gas,
+                    "gas": int(gas_estimate * 1.15),
+                }
 
-            # json_data = {
-            #     "eventType": "AiCampaign::*",
-            #     "network": "XTERIO",
-            #     "txHash": tx,
-            # }
+                signed_transaction = self.eth_w3.eth.account.sign_transaction(
+                    transaction, private_key=self.private_key
+                )
 
-            # response = self.client.post(
-            #     "https://api.xter.io/baas/v1/event/trigger", json=json_data
-            # )
-            # print(response.text)
-            # if response.json()["err_code"] != 0:
-            #     raise Exception(response.text)
-            # else:
-            #     logger.success(f"{self.address} | Successfully claimed chat score")
+                tx_hash = self.eth_w3.eth.send_raw_transaction(
+                    signed_transaction.raw_transaction
+                )
+                receipt = self.eth_w3.eth.wait_for_transaction_receipt(tx_hash)
 
-            # return True
-        except Exception as err:
-            logger.error(f"{self.address} | Failed to claim chat score: {err}")
-            return False
+                if receipt.status != 1:
+                    raise Exception(f"Transaction failed: {tx_hash.hex()}")
+                else:
+                    logger.success(f"{self.address} | Successfully claimed chat score")
+                    return True
+
+                # tx = "0x" + tx_hash.hex()
+
+                # json_data = {
+                #     "eventType": "AiCampaign::*",
+                #     "network": "XTERIO",
+                #     "txHash": tx,
+                # }
+
+                # response = self.client.post(
+                #     "https://api.xter.io/baas/v1/event/trigger", json=json_data
+                # )
+                # print(response.text)
+                # if response.json()["err_code"] != 0:
+                #     raise Exception(response.text)
+                # else:
+                #     logger.success(f"{self.address} | Successfully claimed chat score")
+
+                # return True
+            except Exception as err:
+                logger.error(
+                    f"{self.address} | Failed to claim chat score {retry + 1}/{self.config['settings']['claim_retry_attempts']}: {err}"
+                )
+                time.sleep(
+                    random.randint(
+                        self.config["settings"]["pause_between_claim_retries"][0],
+                        self.config["settings"]["pause_between_claim_retries"][1],
+                    )
+                )
+
+        return False
 
     def complete_task(self, task_id):
         try:
@@ -656,7 +692,7 @@ class Xterio:
             )
 
             return True
-        
+
         except Exception as err:
             logger.error(f"{self.address} | Failed to check account score: {err}")
             return False
