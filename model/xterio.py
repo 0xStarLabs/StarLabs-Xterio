@@ -16,7 +16,7 @@ from extra.converter import mnemonic_to_private_key
 from model import constants, email_parser
 from data import chat_messages
 from model.binance import withdraw
-from model.captcha_solver import CaptchaSolver
+from model.captcha_solver import CaptchaSolver, TwentyFourCaptchaSolver
 from model.gpt import ask_chatgpt
 
 
@@ -136,7 +136,7 @@ class Xterio:
                         hour=0, minute=0, second=0, microsecond=0
                     )
 
-                    # Если date_obj меньше нач��ла текущего дня, значит обновление было не сегодня
+                    # Если date_obj меньше начала текущего дня, значит обновление было не сегодня
                     is_yesterday = date_obj < today_start
 
                     if is_yesterday:
@@ -504,10 +504,18 @@ class Xterio:
 
                     logger.info(f"{self.address} | Solving captcha for chat messages")
 
-                    solver = CaptchaSolver(
-                        proxy=self.config["captcha"]["captcha_proxy"],
-                        api_key=self.config["captcha"]["captcha_api_key"],
-                    )
+                    if self.config["captcha"]["captcha_service"] == "24captcha":
+                        logger.info(f"{self.address} | Using 24captcha")
+                        solver = TwentyFourCaptchaSolver(
+                            api_key=self.config["captcha"]["captcha_api_key"],
+                            proxy=self.config["captcha"]["captcha_proxy"],
+                        )
+                    else:
+                        logger.info(f"{self.address} | Using BestCaptcha")
+                        solver = CaptchaSolver(
+                            proxy=self.config["captcha"]["captcha_proxy"],
+                            api_key=self.config["captcha"]["captcha_api_key"],
+                        )
 
                     for _ in range(self.config["captcha"]["solve_captcha_attempts"]):
                         result = solver.solve_hcaptcha(sitekey, pageurl)
