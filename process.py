@@ -22,8 +22,9 @@ def start():
             "[2] Withdraw from Binance\n"
             "[3] Bridge to Xterio from BNB\n"
             "[4] Collect invite codes\n"
-            "[5] Connect email\n"
-            "[6] Check account score\n\n>> "
+            "[5] Connect email 2FA\n"
+            "[6] Connect profile email (for tasks)\n"
+            "[7] Check account score\n\n>> "
         ).strip()
     )
 
@@ -44,7 +45,7 @@ def start():
     private_keys = extra.read_txt_file("private keys", "data/private_keys.txt")
     indexes = [i + 1 for i in range(len(private_keys))]
 
-    if task == 5:
+    if task == 5 or task == 6:
         emails = extra.read_txt_file("emails", "data/emails.txt")
     else:
         emails = [":" for _ in range(len(private_keys))]
@@ -87,23 +88,23 @@ def account_flow(
     try:
         xterio_instance = model.xterio.Xterio(private_key, proxy, config, email)
 
-        ok = wrapper(xterio_instance.init_instance, 1)
+        ok = wrapper(xterio_instance.init_instance, 3)
 
         if not ok:
             raise Exception("unable to init xterio instance")
 
         if task == 1:
-            ok = wrapper(xterio_instance.complete_all_tasks, 1)
+            ok = wrapper(xterio_instance.complete_all_tasks, 3)
             if not ok:
                 raise Exception("unable to complete all tasks")
 
         elif task == 2:
-            ok = wrapper(xterio_instance.withdraw_from_binance, 1)
+            ok = wrapper(xterio_instance.withdraw_from_binance, 3)
             if not ok:
                 raise Exception("unable to withdraw from binance")
 
         elif task == 3:
-            ok = wrapper(xterio_instance.bridge_eth, 1)
+            ok = wrapper(xterio_instance.bridge_eth, 3)
             if not ok:
                 raise Exception("unable to bridge to xterio")
 
@@ -115,12 +116,17 @@ def account_flow(
                         f.write(f"{private_key}|{invite_code}\n")
 
         elif task == 5:
-            ok = wrapper(xterio_instance.connect_email, 1)
+            ok = wrapper(xterio_instance.connect_email, 3)
             if not ok:
-                raise Exception("unable to connect email")
+                raise Exception("unable to connect 2fa email")
 
         elif task == 6:
-            ok = wrapper(xterio_instance.check_account_score, 1)
+            ok = wrapper(xterio_instance.connect_email_tasks, 3)
+            if not ok:
+                raise Exception("unable to connect tasks email")
+
+        elif task == 7:
+            ok = wrapper(xterio_instance.check_account_score, 3)
             if not ok:
                 raise Exception("unable to check account score")
 

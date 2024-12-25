@@ -34,6 +34,7 @@ class Xterio:
         self.client: requests.Session | None = None
 
         self.is_captcha_solved_for_chat = False
+        self.access_token = None
 
     def init_instance(self):
         for _ in range(5):
@@ -437,9 +438,13 @@ class Xterio:
             for attempt in range(3):
                 for _ in range(3):
                     if self.config["settings"]["use_chatgpt"]:
-                        response = self.client.get("https://api.xter.io/ai/v1/scene?lang=")
+                        response = self.client.get(
+                            "https://api.xter.io/ai/v1/scene?lang="
+                        )
                         if response.json()["err_code"] != 0:
-                            logger.error(f"{self.address} | Failed to get chat messages: {response.text}")
+                            logger.error(
+                                f"{self.address} | Failed to get chat messages: {response.text}"
+                            )
                             continue
 
                         scene_list = response.json()["data"]["list"]
@@ -459,9 +464,13 @@ class Xterio:
 
                         scene = chat_item["describe"]
 
-                        response = self.client.get("https://api.xter.io/ai/v1/user/chat")
+                        response = self.client.get(
+                            "https://api.xter.io/ai/v1/user/chat"
+                        )
                         if response.json()["err_code"] != 0:
-                            logger.error(f"{self.address} | Failed to get chat messages: {response.text}")
+                            logger.error(
+                                f"{self.address} | Failed to get chat messages: {response.text}"
+                            )
                             continue
 
                         message_list = response.json()["data"]["list"]
@@ -469,7 +478,9 @@ class Xterio:
                             prologue = chat_item["prologue"]
                             placeholder = chat_item["placeholder"]
 
-                            message = f"Prologue: {prologue}. Placeholder: {placeholder}"
+                            message = (
+                                f"Prologue: {prologue}. Placeholder: {placeholder}"
+                            )
 
                         else:
                             last_message = (
@@ -490,7 +501,9 @@ class Xterio:
                         )
 
                         if "Error occurred:" in message:
-                            logger.error(f"{self.address} | Failed to send chat message: {message}")
+                            logger.error(
+                                f"{self.address} | Failed to send chat message: {message}"
+                            )
                             continue
 
                         if attempt == 0:
@@ -508,7 +521,9 @@ class Xterio:
                         sitekey = "2032769e-62c0-4304-87e4-948e81367fba"
                         pageurl = "https://app.xter.io/activities/ai-campaign"
 
-                        logger.info(f"{self.address} | Solving captcha for chat messages")
+                        logger.info(
+                            f"{self.address} | Solving captcha for chat messages"
+                        )
 
                         if self.config["captcha"]["captcha_service"] == "24captcha":
                             logger.info(f"{self.address} | Using 24captcha")
@@ -523,10 +538,14 @@ class Xterio:
                                 api_key=self.config["captcha"]["captcha_api_key"],
                             )
 
-                        for _ in range(self.config["captcha"]["solve_captcha_attempts"]):
+                        for _ in range(
+                            self.config["captcha"]["solve_captcha_attempts"]
+                        ):
                             result = solver.solve_hcaptcha(sitekey, pageurl)
                             if result:
-                                logger.success(f"{self.address} | Captcha solved for chat")
+                                logger.success(
+                                    f"{self.address} | Captcha solved for chat"
+                                )
                                 break
                             else:
                                 logger.error(
@@ -554,10 +573,15 @@ class Xterio:
                     time.sleep(random.randint(3, 6))
                     break
 
-                pause = random.randint(self.config["settings"]["pause_between_messages"][0], self.config["settings"]["pause_between_messages"][1])
-                logger.info(f"{self.address} | Pausing for {pause} seconds between messages")
+                pause = random.randint(
+                    self.config["settings"]["pause_between_messages"][0],
+                    self.config["settings"]["pause_between_messages"][1],
+                )
+                logger.info(
+                    f"{self.address} | Pausing for {pause} seconds between messages"
+                )
                 time.sleep(pause)
-                
+
         except Exception as err:
             logger.error(f"{self.address} | Failed to send chat message: {err}")
             return False
@@ -695,6 +719,68 @@ class Xterio:
             logger.error(f"{self.address} | Failed to connect email: {err}")
             return False
 
+    def connect_email_tasks(self):
+        try:
+            logger.info(f"{self.address} | Trying to connect tasks email...")
+
+            json_data = {
+                    "email": self.email_login,
+                    "access_token": self.access_token,
+                }
+
+            response = self.client.post(
+                "https://api.xter.io/account/v1/user/email",
+                json=json_data,
+            )
+            if "forbidden" in response.text:
+                logger.info(f"{self.address} | Email already connected!")
+                return True
+            
+            if response.json()["err_code"] != 0:
+                if "reqeust too frequently" in response.text:
+                    logger.info(f"{self.address} | Request too frequently. Wait like 20 minutes, please :)")
+                    return False
+                
+                else:
+                    raise Exception(response.text)
+            else:
+                logger.success(f"{self.address} | Email code sent!")
+
+            email_checker = email_parser.SyncEmailChecker(
+                email=self.email_login, password=self.email_password
+            )
+
+            if email_checker.check_if_email_valid():
+                # Search for verification code
+                logger.info(f"{self.address} | Searching for email code...")
+                code = email_checker.check_email_for_code()
+                if code:
+                    logger.success(f"{self.address} | Email code: {code}")
+                else:
+                    raise Exception("Failed to get email code")
+            else:
+                logger.error(f"{self.address} | Invalid email credentials")
+                return False
+
+            response = self.client.post(
+                "https://api.xter.io/account/v1/user/email/verify",
+                json={
+                    "code": code,
+                    "access_token": self.access_token,
+                    "subscribe": 0,
+                },
+            )
+
+            if response.json()["err_code"] != 0:
+                raise Exception(response.text)
+            else:
+                logger.success(f"{self.address} | Email {self.email_login} connected!")
+                return True
+
+        except Exception as err:
+            logger.error(f"{self.address} | Failed to connect email: {err}")
+            return False
+
     def check_account_score(self):
         try:
             response = self.client.get("https://api.xter.io/ai/v1/user/score")
@@ -794,6 +880,7 @@ class Xterio:
             else:
                 logger.success(f"{self.address} | Sign into Xterio account.")
                 self.client.headers.update({"authorization": res["data"]["id_token"]})
+                self.access_token = res["data"]["access_token"]
                 return True, is_new
 
         except Exception as err:
