@@ -723,10 +723,42 @@ class Xterio:
         try:
             logger.info(f"{self.address} | Trying to connect tasks email...")
 
+            sitekey = "d9c6e7b2-b392-4f42-826c-f7fc4ac696a4"
+            pageurl = "https://app.xter.io/settings?tab=profile"
+
+            logger.info(f"{self.address} | Solving captcha for email connect")
+
+            if self.config["captcha"]["captcha_service"] == "24captcha":
+                logger.info(f"{self.address} | Using 24captcha")
+                solver = TwentyFourCaptchaSolver(
+                    api_key=self.config["captcha"]["captcha_api_key"],
+                    proxy=self.config["captcha"]["captcha_proxy"],
+                )
+            else:
+                logger.info(f"{self.address} | Using BestCaptcha")
+                solver = CaptchaSolver(
+                    proxy=self.config["captcha"]["captcha_proxy"],
+                    api_key=self.config["captcha"]["captcha_api_key"],
+                )
+
+            for _ in range(self.config["captcha"]["solve_captcha_attempts"]):
+                result = solver.solve_hcaptcha(sitekey, pageurl)
+                if result:
+                    logger.success(f"{self.address} | Captcha solved for email connect")
+                    break
+                else:
+                    logger.error(f"{self.address} | Failed to solve captcha for email connect")
+
+            if not result:
+                raise Exception("failed to solve captcha for email connect 3 times")
+
+            json_data["h-recaptcha-response"] = result.strip()
+
             json_data = {
-                    "email": self.email_login,
-                    "access_token": self.access_token,
-                }
+                "email": self.email_login,
+                "access_token": self.access_token,
+                "h-recaptcha-response": result.strip(),
+            }
 
             response = self.client.post(
                 "https://api.xter.io/account/v1/user/email",
@@ -735,12 +767,14 @@ class Xterio:
             if "forbidden" in response.text:
                 logger.info(f"{self.address} | Email already connected!")
                 return True
-            
+
             if response.json()["err_code"] != 0:
                 if "reqeust too frequently" in response.text:
-                    logger.info(f"{self.address} | Request too frequently. Wait like 20 minutes, please :)")
+                    logger.info(
+                        f"{self.address} | Request too frequently. Wait like 20 minutes, please :)"
+                    )
                     return False
-                
+
                 else:
                     raise Exception(response.text)
             else:
