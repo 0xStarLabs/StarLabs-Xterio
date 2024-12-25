@@ -752,8 +752,6 @@ class Xterio:
             if not result:
                 raise Exception("failed to solve captcha for email connect 3 times")
 
-            json_data["h-recaptcha-response"] = result.strip()
-
             json_data = {
                 "email": self.email_login,
                 "access_token": self.access_token,
