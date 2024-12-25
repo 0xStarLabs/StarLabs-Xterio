@@ -435,118 +435,129 @@ class Xterio:
     def send_chat_messages(self):
         try:
             for attempt in range(3):
-                if self.config["settings"]["use_chatgpt"]:
-                    response = self.client.get("https://api.xter.io/ai/v1/scene?lang=")
-                    if response.json()["err_code"] != 0:
-                        raise Exception(response.text)
+                for _ in range(3):
+                    if self.config["settings"]["use_chatgpt"]:
+                        response = self.client.get("https://api.xter.io/ai/v1/scene?lang=")
+                        if response.json()["err_code"] != 0:
+                            logger.error(f"{self.address} | Failed to get chat messages: {response.text}")
+                            continue
 
-                    scene_list = response.json()["data"]["list"]
-                    if not scene_list:
-                        raise Exception("Scene list is empty")
-                    scene = (
-                        scene_list[0]["describe"]
-                        if len(scene_list) == 1
-                        else scene_list[-1]["describe"]
-                    )
-                    if len(scene_list[0]) == 1:
-                        chat_item = scene_list[0]
-                    else:
-                        chat_item = scene_list[-1]
+                        scene_list = response.json()["data"]["list"]
+                        if not scene_list:
+                            logger.error(f"{self.address} | Scene list is empty")
+                            continue
 
-                    scene = chat_item["describe"]
-
-                    response = self.client.get("https://api.xter.io/ai/v1/user/chat")
-                    if response.json()["err_code"] != 0:
-                        raise Exception(response.text)
-
-                    message_list = response.json()["data"]["list"]
-                    if not message_list:
-                        prologue = chat_item["prologue"]
-                        placeholder = chat_item["placeholder"]
-
-                        message = f"Prologue: {prologue}. Placeholder: {placeholder}"
-
-                    else:
-                        last_message = (
-                            message_list[0]
-                            if len(message_list) == 1
-                            else message_list[-1]
+                        scene = (
+                            scene_list[0]["describe"]
+                            if len(scene_list) == 1
+                            else scene_list[-1]["describe"]
                         )
-
-                        ai_answer_text = last_message["extract"]["words"]
-                        ai_answer_mood = last_message["extract"]["mood"]
-
-                        message = f"Scene: {scene}. AI mood: {ai_answer_mood}. AI asks you: {ai_answer_text}"
-
-                    message = ask_chatgpt(
-                        self.config["settings"]["chat_gpt_api_key"],
-                        message,
-                        self.config["settings"]["proxy_for_chat_gpt"],
-                    )
-
-                    if "Error occurred:" in message:
-                        raise Exception(message)
-
-                    if attempt == 0:
-                        message = "You all right. " + message
-
-                else:
-                    message = random.choice(chat_messages.CHAT_MESSAGES)
-
-                json_data = {
-                    "answer": message,
-                    "lang": "en",
-                }
-
-                if not self.is_captcha_solved_for_chat:
-                    sitekey = "2032769e-62c0-4304-87e4-948e81367fba"
-                    pageurl = "https://app.xter.io/activities/ai-campaign"
-
-                    logger.info(f"{self.address} | Solving captcha for chat messages")
-
-                    if self.config["captcha"]["captcha_service"] == "24captcha":
-                        logger.info(f"{self.address} | Using 24captcha")
-                        solver = TwentyFourCaptchaSolver(
-                            api_key=self.config["captcha"]["captcha_api_key"],
-                            proxy=self.config["captcha"]["captcha_proxy"],
-                        )
-                    else:
-                        logger.info(f"{self.address} | Using BestCaptcha")
-                        solver = CaptchaSolver(
-                            proxy=self.config["captcha"]["captcha_proxy"],
-                            api_key=self.config["captcha"]["captcha_api_key"],
-                        )
-
-                    for _ in range(self.config["captcha"]["solve_captcha_attempts"]):
-                        result = solver.solve_hcaptcha(sitekey, pageurl)
-                        if result:
-                            logger.success(f"{self.address} | Captcha solved for chat")
-                            break
+                        if len(scene_list[0]) == 1:
+                            chat_item = scene_list[0]
                         else:
-                            logger.error(
-                                f"{self.address} | Failed to solve captcha for chat"
+                            chat_item = scene_list[-1]
+
+                        scene = chat_item["describe"]
+
+                        response = self.client.get("https://api.xter.io/ai/v1/user/chat")
+                        if response.json()["err_code"] != 0:
+                            logger.error(f"{self.address} | Failed to get chat messages: {response.text}")
+                            continue
+
+                        message_list = response.json()["data"]["list"]
+                        if not message_list:
+                            prologue = chat_item["prologue"]
+                            placeholder = chat_item["placeholder"]
+
+                            message = f"Prologue: {prologue}. Placeholder: {placeholder}"
+
+                        else:
+                            last_message = (
+                                message_list[0]
+                                if len(message_list) == 1
+                                else message_list[-1]
                             )
 
-                    if not result:
-                        raise Exception("failed to solve captcha for chat 3 times")
+                            ai_answer_text = last_message["extract"]["words"]
+                            ai_answer_mood = last_message["extract"]["mood"]
 
-                    json_data["h-recaptcha-response"] = result.strip()
+                            message = f"Scene: {scene}. AI mood: {ai_answer_mood}. AI asks you: {ai_answer_text}"
 
-                response = self.client.post(
-                    "https://api.xter.io/ai/v1/chat",
-                    json=json_data,
-                )
+                        message = ask_chatgpt(
+                            self.config["settings"]["chat_gpt_api_key"],
+                            message,
+                            self.config["settings"]["proxy_for_chat_gpt"],
+                        )
 
-                if "error" in response.text:
-                    logger.error(
-                        f"{self.address} | Failed to send chat message: {response.text}"
+                        if "Error occurred:" in message:
+                            logger.error(f"{self.address} | Failed to send chat message: {message}")
+                            continue
+
+                        if attempt == 0:
+                            message = "You all right. " + message
+
+                    else:
+                        message = random.choice(chat_messages.CHAT_MESSAGES)
+
+                    json_data = {
+                        "answer": message,
+                        "lang": "en",
+                    }
+
+                    if not self.is_captcha_solved_for_chat:
+                        sitekey = "2032769e-62c0-4304-87e4-948e81367fba"
+                        pageurl = "https://app.xter.io/activities/ai-campaign"
+
+                        logger.info(f"{self.address} | Solving captcha for chat messages")
+
+                        if self.config["captcha"]["captcha_service"] == "24captcha":
+                            logger.info(f"{self.address} | Using 24captcha")
+                            solver = TwentyFourCaptchaSolver(
+                                api_key=self.config["captcha"]["captcha_api_key"],
+                                proxy=self.config["captcha"]["captcha_proxy"],
+                            )
+                        else:
+                            logger.info(f"{self.address} | Using BestCaptcha")
+                            solver = CaptchaSolver(
+                                proxy=self.config["captcha"]["captcha_proxy"],
+                                api_key=self.config["captcha"]["captcha_api_key"],
+                            )
+
+                        for _ in range(self.config["captcha"]["solve_captcha_attempts"]):
+                            result = solver.solve_hcaptcha(sitekey, pageurl)
+                            if result:
+                                logger.success(f"{self.address} | Captcha solved for chat")
+                                break
+                            else:
+                                logger.error(
+                                    f"{self.address} | Failed to solve captcha for chat"
+                                )
+
+                        if not result:
+                            raise Exception("failed to solve captcha for chat 3 times")
+
+                        json_data["h-recaptcha-response"] = result.strip()
+
+                    response = self.client.post(
+                        "https://api.xter.io/ai/v1/chat",
+                        json=json_data,
                     )
-                else:
-                    logger.success(f"{self.address} | Sent chat message: {message}")
-                    self.is_captcha_solved_for_chat = True
 
-                time.sleep(random.randint(3, 6))
+                    if "error" in response.text:
+                        logger.error(
+                            f"{self.address} | Failed to send chat message: {response.text}"
+                        )
+                    else:
+                        logger.success(f"{self.address} | Sent chat message: {message}")
+                        self.is_captcha_solved_for_chat = True
 
+                    time.sleep(random.randint(3, 6))
+                    break
+
+                pause = random.randint(self.config["settings"]["pause_between_messages"][0], self.config["settings"]["pause_between_messages"][1])
+                logger.info(f"{self.address} | Pausing for {pause} seconds between messages")
+                time.sleep(pause)
+                
         except Exception as err:
             logger.error(f"{self.address} | Failed to send chat message: {err}")
             return False

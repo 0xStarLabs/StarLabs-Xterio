@@ -4,6 +4,8 @@ captcha:
 
   # captcha service
   # available services: "24captcha", "bestcaptcha"
+  # links: https://24captcha.online/
+  # links: https://bestcaptcha.com/
   captcha_service: "24captcha"
 
   # proxies for captcha solver. format user:pass@ip:port. by default it's ""
@@ -30,6 +32,7 @@ settings:
   # pause between tasks in seconds
   pause_between_tasks: [2, 5]
 
+  pause_between_messages: [30, 40]
   # pause between accounts in seconds
   pause_between_accounts: [10, 20]
 
